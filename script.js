@@ -398,11 +398,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const apiPromises = [];
             const selectedStyle = characterStyleSelect.value;
             
-            // [MODIFIED] hairInstruction updated as per your request
+            // [MODIFIED] hairInstruction updated with cm estimates.
             const hairInstruction = `Deskripsikan rambut dengan sangat detail, pecah ke dalam kategori berikut:
 - **Warna Rambut:** Warna Rambut (jika warnanya tidak alami tambahkan imbuhan diwarnai).
 - **Tekstur & Pola Rambut:** Tipe Rambut (lurus, bergelombang, ikal, keriting), Detail Tekstur (gelombang longgar/rapat, ikal spiral/besar), Kondisi Helai (tebal/tipis), Kehalusan/Kekusutan (halus, frizzy, flyaways).
-- **Panjang & Potongan Rambut:** Panjang Keseluruhan (sebatas dagu, sebahu, sebatas punggung tengah, sangat panjang), Gaya Potongan/Haircut (bob, pixie, bixie, undercut, comma hair, two block, layer, blunt cut, shaggy), Poni (poni depan, curtain bangs).
+- **Panjang & Potongan Rambut:** Panjang Keseluruhan (sebatas dagu (sekitar 15-25 cm), sebahu (sekitar 25-40 cm), sebatas punggung tengah (sekitar 40-60 cm), sangat panjang (lebih dari 60 cm)), Gaya Potongan/Haircut (bob, pixie, bixie, undercut, comma hair, two block, layer, blunt cut, shaggy), Poni (poni depan, curtain bangs).
 - **Gaya & Penataan Rambut:** Penataan (tergerai, ekor kuda, dikepang), Belahan Rambut (tengah, samping), dan Aksesori (jepit, bando).
 - **Kesan & Karakteristik Unik:** Volume (tebal/kempes), Kilau (berkilau/kusam), dan Detail lain (uban, ujung berwarna).`;
             
