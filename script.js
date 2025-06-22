@@ -378,7 +378,6 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
 
-    // [MODIFIED] This function now combines narrative instructions with a structured JSON output request.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
@@ -399,7 +398,6 @@ document.addEventListener('DOMContentLoaded', () => {
             const apiPromises = [];
             const selectedStyle = characterStyleSelect.value;
             
-            // These narrative instructions will guide the AI on HOW to describe things.
             const hairInstruction = `Deskripsikan rambut dengan sangat detail, pecah ke dalam kategori berikut:
 - **Warna Rambut:** Warna Dasar (hitam, cokelat, dll.), Highlight & Lowlight, Gradasi & Akar, dan Nada Warna (hangat, dingin).
 - **Tekstur & Pola Rambut:** Tipe Rambut (lurus, bergelombang, ikal, keriting), Detail Tekstur (gelombang longgar/rapat, ikal spiral/besar), Kondisi Helai (tebal/tipis), Kehalusan/Kekusutan (halus, frizzy, flyaways).
@@ -407,9 +405,10 @@ document.addEventListener('DOMContentLoaded', () => {
 - **Gaya & Penataan Rambut:** Penataan (tergerai, ekor kuda, dikepang), Belahan Rambut (tengah, samping), dan Aksesori (jepit, bando).
 - **Kesan & Karakteristik Unik:** Volume (tebal/kempes), Kilau (berkilau/kusam), dan Detail lain (uban, ujung berwarna).`;
             
-            // This is the main instruction that asks for a JSON object, using the narrative instructions as a guide.
+            // [MODIFIED] Updated faceInstruction with specific details for the 'identity' key.
             const faceInstruction = `Berdasarkan gambar wajah yang diunggah, analisis dan kembalikan sebuah objek JSON. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
 Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair".
+- Untuk kunci "identity", berikan deskripsi yang berisi jenis kelamin, perkiraan usia, dan asal negara/etnis (Contoh: "Seorang pria berusia 25 tahun dari Korea").
 - Untuk kunci "hair", gunakan panduan deskripsi berikut: ${hairInstruction}.
 - Untuk kunci lainnya, berikan deskripsi yang sesuai.
 - Gaya deskripsi harus untuk karakter '${selectedStyle}'.`;
@@ -420,13 +419,13 @@ Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "
                 const clothingInstruction = `Berdasarkan gambar pakaian, analisis dan kembalikan objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON. Gaya deskripsi harus untuk karakter '${selectedStyle}'.`;
                 apiPromises.push(callGeminiAPI(clothingInstruction, [characterImageData.clothing]));
             } else {
-                apiPromises.push(Promise.resolve('{}')); // Return empty JSON object if no image
+                apiPromises.push(Promise.resolve('{}'));
             }
             if (characterImageData.accessories) {
                 const accessoriesInstruction = `Berdasarkan gambar aksesori, analisis dan kembalikan objek JSON dengan kunci "accessory". Balas HANYA dengan objek JSON. Jika tidak ada aksesori, nilai harus "none".`;
                 apiPromises.push(callGeminiAPI(accessoriesInstruction, [characterImageData.accessories]));
             } else {
-                apiPromises.push(Promise.resolve('{}')); // Return empty JSON object if no image
+                apiPromises.push(Promise.resolve('{}'));
             }
             
             const [faceResult, clothingResult, accessoriesResult] = await Promise.all(apiPromises);
@@ -436,7 +435,6 @@ Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "
                 const clothingData = JSON.parse(clothingResult);
                 const accessoriesData = JSON.parse(accessoriesResult);
 
-                // Build the final character sheet string using the parsed data
                 const finalDescription = `// MASTER PROMPT / CHARACTER SHEET: ${characterName} (v2.0)
 (
     ${characterName.toLowerCase().replace(/ /g, '_')}:
@@ -465,7 +463,7 @@ Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "
 
             } catch(e) {
                 console.error("Gagal mem-parsing JSON dari API. Response:", {faceResult, clothingResult, accessoriesResult}, "Error:", e);
-                throw new Error("Gagal membuat Character Sheet karena respons API tidak valid."); // Re-throw to be caught by handleApiInteraction
+                throw new Error("Gagal membuat Character Sheet karena respons API tidak valid.");
             }
         });
     }
@@ -482,7 +480,6 @@ Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "
             return;
         }
 
-        // [MODIFIED] Try to extract name from character sheet for a better user experience
         let defaultName = "Karakter Baru";
         const nameMatch = subject.match(/\/\/\s*MASTER PROMPT\s*\/\s*CHARACTER SHEET:\s*(.*?)\s*\(v2.0\)/);
         if (nameMatch && nameMatch[1]) {
