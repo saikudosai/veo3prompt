@@ -404,8 +404,7 @@ document.addEventListener('DOMContentLoaded', () => {
 - **Panjang & Potongan Rambut:** Panjang Keseluruhan (sebatas dagu (sekitar 15-25 cm), sebahu (sekitar 25-40 cm), sebatas punggung tengah (sekitar 40-60 cm), sangat panjang (lebih dari 60 cm)), Gaya Potongan/Haircut (bob, pixie, bixie, undercut, comma hair, two block, layer, blunt cut, shaggy), Poni (poni depan, curtain bangs).
 - **Gaya & Penataan Rambut:** Penataan (tergerai, ekor kuda, dikepang), Belahan Rambut (tengah, samping), dan Aksesori (jepit, bando).
 - **Kesan & Karakteristik Unik:** Volume (tebal/kempes), Kilau (berkilau/kusam), dan Detail lain (uban, ujung berwarna).`;
-
-            // [MODIFIED] Added conditional instruction logic for 'vibe'.
+            
             let vibeInstruction;
             if (selectedStyle === 'Fiksi') {
                 vibeInstruction = `- "vibe": berikan deskripsi kesan atau "vibe" keseluruhan, dan tambahkan kata yang mengandung unsur fantasi (contoh: mystical, ethereal, otherworldly).`;
@@ -428,12 +427,19 @@ ${vibeInstruction}
             
             apiPromises.push(callGeminiAPI(faceInstruction, [characterImageData.face]));
             
+            // [MODIFIED] Added conditional logic for clothingInstruction.
             if (characterImageData.clothing) {
-                const clothingInstruction = `Berdasarkan gambar pakaian, analisis dan kembalikan objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON. Gaya deskripsi harus untuk karakter '${selectedStyle}'.`;
+                let clothingInstruction;
+                if (selectedStyle === 'Fiksi') {
+                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan kembalikan objek JSON dengan kunci "top" dan "bottom". Pastikan deskripsi mengandung unsur fantasi (contoh: jubah ajaib, armor elf). Balas HANYA dengan objek JSON.`;
+                } else { // Non Fiksi
+                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan deskripsikan sebagai sebuah "kostum" dalam objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON.`;
+                }
                 apiPromises.push(callGeminiAPI(clothingInstruction, [characterImageData.clothing]));
             } else {
                 apiPromises.push(Promise.resolve('{}'));
             }
+
             if (characterImageData.accessories) {
                 const accessoriesInstruction = `Berdasarkan gambar aksesori, analisis dan kembalikan objek JSON dengan kunci "accessory". Balas HANYA dengan objek JSON. Jika tidak ada aksesori, nilai harus "none".`;
                 apiPromises.push(callGeminiAPI(accessoriesInstruction, [characterImageData.accessories]));
