@@ -231,7 +231,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
         
-        // URL sekarang menunjuk ke backend kita sendiri
         const apiUrl = `/api/apigemini`;
         const payload = { contents: [{ parts: parts }] };
         
@@ -251,7 +250,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
         
         if (text) {
-            return text.trim();
+             // Clean markdown and potential JSON artifacts
+            return text.replace(/```json/g, '').replace(/```/g, '').trim();
         } else {
             console.log("No valid response text found, full response:", result);
             throw new Error("Invalid or empty response structure from API.");
@@ -286,11 +286,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await apiFunction();
         } catch (error) {
             console.error("API Interaction Error:", error);
-            if (error.message.includes('403')) {
-                alert("Akses API Ditolak (Error 403: Referer Blocked).\n\nIni karena pembatasan keamanan pada API Key Anda.\n\nCARA MEMPERBAIKI:\n1. Buka Google AI Studio.\n2. Edit API Key Anda.\n3. Di bagian 'Website restrictions', klik 'ADD A WEBSITE'.\n4. Salin dan tempel URL dari pesan error di console (lihat di bawah log ini).");
-            } else {
-                alert("Terjadi kesalahan. Silakan coba lagi.");
-            }
+            alert("Terjadi kesalahan saat memproses permintaan. Lihat console untuk detail.");
             coins += cost; // Refund coins on failure
             saveCoins();
             updateCoinDisplay();
@@ -382,15 +378,28 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
 
+    // [MODIFIED] This function now combines narrative instructions with a structured JSON output request.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
             return;
         }
+        
         handleApiInteraction(createCharacterBtn, 3, async () => {
+            const characterName = prompt("Masukkan nama untuk karakter ini:", "Karakter Baru");
+            if (!characterName) {
+                // Refund coins if user cancels the prompt
+                coins += 3;
+                saveCoins();
+                updateCoinDisplay();
+                console.log("Pembuatan karakter dibatalkan.");
+                return;
+            }
+
             const apiPromises = [];
             const selectedStyle = characterStyleSelect.value;
             
+            // These narrative instructions will guide the AI on HOW to describe things.
             const hairInstruction = `Deskripsikan rambut dengan sangat detail, pecah ke dalam kategori berikut:
 - **Warna Rambut:** Warna Dasar (hitam, cokelat, dll.), Highlight & Lowlight, Gradasi & Akar, dan Nada Warna (hangat, dingin).
 - **Tekstur & Pola Rambut:** Tipe Rambut (lurus, bergelombang, ikal, keriting), Detail Tekstur (gelombang longgar/rapat, ikal spiral/besar), Kondisi Helai (tebal/tipis), Kehalusan/Kekusutan (halus, frizzy, flyaways).
@@ -398,58 +407,66 @@ document.addEventListener('DOMContentLoaded', () => {
 - **Gaya & Penataan Rambut:** Penataan (tergerai, ekor kuda, dikepang), Belahan Rambut (tengah, samping), dan Aksesori (jepit, bando).
 - **Kesan & Karakteristik Unik:** Volume (tebal/kempes), Kilau (berkilau/kusam), dan Detail lain (uban, ujung berwarna).`;
             
-            let faceInstruction;
-            if (selectedStyle === 'Fiksi') {
-                faceInstruction = `Berdasarkan foto yang diunggah, analisis dan buat deskripsi karakter fiksi yang sangat detail dalam format naratif. Mulailah dengan menebak jenis kelamin, perkiraan usia, dan kemungkinan etnisnya. Kemudian, deskripsikan fitur-fitur berikut secara rinci:
-1.  **Bentuk Wajah dan Kepala:** Deskripsikan bentuk wajah secara keseluruhan (oval, bulat, dll.), dahi, bentuk pipi, garis rahang, dan dagu.
-2.  **Mata:** Deskripsikan warna mata (jika warnanya tidak alami, sebutkan warnanya apa adanya), bentuk mata, ukuran mata, bentuk dan ketebalan alis, serta bulu mata.
-3.  **Hidung:** Deskripsikan bentuk dan ukurannya.
-4.  **Mulut:** Deskripsikan ketebalan dan bentuk bibir.
-5.  **Rambut:** ${hairInstruction} (jika warna tidak alami, sebutkan sebagai 'rambut diwarnai...').
-6.  **Kulit:** Deskripsikan warna kulit (jika tidak alami, sebutkan sebagai 'dengan make up'). Sebutkan juga tanda khusus seperti tahi lalat atau lesung pipi.
-7.  **Rambut Wajah (jika ada):** Deskripsikan jenis dan gayanya.
-8.  **Demeanor:** Deskripsikan pembawaan atau sikap yang terpancar dari ekspresi wajah dan postur (misalnya, tenang, ramah, serius, dengan senyum lembut, dll.).
-9.  **Vibe:** Deskripsikan kesan atau "vibe" keseluruhan dari penampilan (misalnya, stylish, minimalis, rapi, artistik, ceria, dll.).
-Gabungkan semua poin ini menjadi satu paragraf deskriptif yang mengalir secara natural dan mendalam, bukan sebagai daftar. Balas HANYA dengan paragraf deskripsi karakter, tanpa kalimat pembuka apa pun.`;
-            } else { // Non Fiksi
-                faceInstruction = `Berdasarkan foto yang diunggah, analisis dan buat deskripsi karakter yang sangat detail dalam format naratif. Pertama, identifikasi negara asal atau etnis yang paling mungkin dari wajah tersebut, lalu tebak jenis kelamin dan perkiraan usianya. Mulailah deskripsi dengan format: "Seorang [jenis kelamin] dari [negara/etnis] berusia sekitar [umur] tahun...". Kemudian, lanjutkan dengan deskripsi fitur berikut:
-1.  **Bentuk Wajah dan Kepala:** Deskripsikan bentuk wajah, dahi, pipi, garis rahang, dan dagu.
-2.  **Mata:** Deskripsikan warna mata, bentuk mata (almond, bulat, monolid, sayu), ukuran, alis, dan bulu mata.
-3.  **Hidung:** Deskripsikan bentuk dan ukurannya.
-4.  **Mulut:** Deskripsikan ketebalan dan bentuk bibir, serta gigi jika terlihat.
-5.  **Rambut:** ${hairInstruction}
-6.  **Kulit:** Deskripsikan warna kulit dan tanda khusus.
-7.  **Rambut Wajah (jika ada):** Deskripsikan jenis dan gayanya.
-8.  **Demeanor:** Deskripsikan pembawaan atau sikap yang terpancar dari ekspresi wajah dan postur (misalnya, tenang, ramah, serius, dengan senyum lembut, dll.).
-9.  **Vibe:** Deskripsikan kesan atau "vibe" keseluruhan dari penampilan (misalnya, stylish, minimalis, rapi, artistik, ceria, dll.).
-PENTING: Jika Anda mendeteksi fitur yang tidak realistis (seperti warna rambut atau mata yang tidak alami), ganti dengan padanan realistis yang paling mendekati (contoh: rambut biru menjadi pirang, mata ungu menjadi biru). Gabungkan semuanya menjadi satu paragraf yang natural, bukan daftar. Balas HANYA dengan paragraf deskripsi karakter, tanpa kalimat pembuka.`;
-            }
-
+            // This is the main instruction that asks for a JSON object, using the narrative instructions as a guide.
+            const faceInstruction = `Berdasarkan gambar wajah yang diunggah, analisis dan kembalikan sebuah objek JSON. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
+Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair".
+- Untuk kunci "hair", gunakan panduan deskripsi berikut: ${hairInstruction}.
+- Untuk kunci lainnya, berikan deskripsi yang sesuai.
+- Gaya deskripsi harus untuk karakter '${selectedStyle}'.`;
+            
             apiPromises.push(callGeminiAPI(faceInstruction, [characterImageData.face]));
             
             if (characterImageData.clothing) {
-                const clothingInstruction = `Fokus pada pakaian di gambar ini. Deskripsikan secara detail untuk karakter gaya **${selectedStyle}**: jenis pakaian, warna, bahan, pola, dan model potongannya. Balas HANYA dengan frasa deskripsi pakaian ini, tanpa kalimat pembuka.`;
+                const clothingInstruction = `Berdasarkan gambar pakaian, analisis dan kembalikan objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON. Gaya deskripsi harus untuk karakter '${selectedStyle}'.`;
                 apiPromises.push(callGeminiAPI(clothingInstruction, [characterImageData.clothing]));
             } else {
-                apiPromises.push(Promise.resolve(null));
+                apiPromises.push(Promise.resolve('{}')); // Return empty JSON object if no image
             }
             if (characterImageData.accessories) {
-                const accessoriesInstruction = "Fokus pada aksesori di gambar ini (topi, kacamata, perhiasan, dll.). Deskripsikan secara detail untuk karakter gaya **${selectedStyle}**: jenis, bahan, dan warnanya. Jika tidak ada, kembalikan string kosong. Balas HANYA dengan frasa deskripsi aksesori ini, tanpa kalimat pembuka.";
+                const accessoriesInstruction = `Berdasarkan gambar aksesori, analisis dan kembalikan objek JSON dengan kunci "accessory". Balas HANYA dengan objek JSON. Jika tidak ada aksesori, nilai harus "none".`;
                 apiPromises.push(callGeminiAPI(accessoriesInstruction, [characterImageData.accessories]));
             } else {
-                apiPromises.push(Promise.resolve(null));
+                apiPromises.push(Promise.resolve('{}')); // Return empty JSON object if no image
             }
             
-            const [faceDesc, clothingDesc, accessoriesDesc] = await Promise.all(apiPromises);
+            const [faceResult, clothingResult, accessoriesResult] = await Promise.all(apiPromises);
 
-            let finalDescription = faceDesc || "seseorang";
-            if (clothingDesc) finalDescription += `, mengenakan ${clothingDesc}`;
-            if (accessoriesDesc && accessoriesDesc.trim() !== '') {
-                 finalDescription += `, dengan ${accessoriesDesc}`;
+            try {
+                const faceData = JSON.parse(faceResult);
+                const clothingData = JSON.parse(clothingResult);
+                const accessoriesData = JSON.parse(accessoriesResult);
+
+                // Build the final character sheet string using the parsed data
+                const finalDescription = `// MASTER PROMPT / CHARACTER SHEET: ${characterName} (v2.0)
+(
+    ${characterName.toLowerCase().replace(/ /g, '_')}:
+    identity: ${faceData.identity || 'not specified'}.
+    demeanor: ${faceData.demeanor || 'not specified'}.
+    vibe: ${faceData.vibe || 'not specified'}.
+
+    // --- Physical Appearance ---
+    face_shape: ${faceData.face_shape || 'not specified'}.
+    eyes: ${faceData.eyes || 'not specified'}.
+    nose: ${faceData.nose || 'not specified'}.
+    lips: ${faceData.lips || 'not specified'}.
+    hair: (${faceData.hair || 'not specified'}:1.2).
+    skin: ${faceData.skin || 'not specified'}.
+    facial_hair: (${faceData.facial_hair || 'none'}:1.5).
+
+    // --- Attire & Accessories ---
+    attire:
+        top: ${clothingData.top || 'not specified'}.
+        bottom: ${clothingData.bottom || 'not specified'}.
+    accessory: (${accessoriesData.accessory || 'none'}:1.3).
+)`.trim();
+                
+                inputs.subjek.value = finalDescription;
+                characterCreatorModal.classList.add('hidden');
+
+            } catch(e) {
+                console.error("Gagal mem-parsing JSON dari API. Response:", {faceResult, clothingResult, accessoriesResult}, "Error:", e);
+                throw new Error("Gagal membuat Character Sheet karena respons API tidak valid."); // Re-throw to be caught by handleApiInteraction
             }
-            
-            inputs.subjek.value = finalDescription;
-            characterCreatorModal.classList.add('hidden');
         });
     }
     
@@ -465,7 +482,14 @@ PENTING: Jika Anda mendeteksi fitur yang tidak realistis (seperti warna rambut a
             return;
         }
 
-        const characterName = prompt("Masukkan nama untuk karakter ini:", "Karakter Baru");
+        // [MODIFIED] Try to extract name from character sheet for a better user experience
+        let defaultName = "Karakter Baru";
+        const nameMatch = subject.match(/\/\/\s*MASTER PROMPT\s*\/\s*CHARACTER SHEET:\s*(.*?)\s*\(v2.0\)/);
+        if (nameMatch && nameMatch[1]) {
+            defaultName = nameMatch[1].trim();
+        }
+
+        const characterName = prompt("Masukkan nama untuk karakter ini:", defaultName);
         if (!characterName) return; // User cancelled
 
         const characters = getSavedCharacters();
