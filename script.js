@@ -1,5 +1,5 @@
-// Prompt Generator - Versi 1.1.0
-// Disimpan pada: Senin, 23 Juni 2025
+// Prompt Generator - Versi 1.2.0
+// Disimpan pada: Kamis, 26 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
 document.addEventListener('DOMContentLoaded', () => {
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeLoadCharacterBtn = document.getElementById('closeLoadCharacterBtn');
     const characterList = document.getElementById('characterList');
 
-    // --- [NEW] Scene Mode Selectors ---
+    // --- Scene Mode Selectors ---
     const singleSceneBtn = document.getElementById('singleSceneBtn');
     const conversationSceneBtn = document.getElementById('conversationSceneBtn');
     const singleSceneModeContainer = document.getElementById('singleSceneModeContainer');
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let adOpenedTime = null;
     let singleUploadedImageData = null; 
     let characterImageData = { face: null, clothing: null, accessories: null };
-    // --- [NEW] Scene Mode State ---
+    // --- Scene Mode State ---
     let currentSceneMode = 'single'; // 'single' or 'conversation'
     let selectedCharacters = [];
     let dialogueLines = [];
@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- [NEW] SCENE MODE LOGIC ---
+    // --- SCENE MODE LOGIC ---
     function switchSceneMode(mode) {
         currentSceneMode = mode;
         if (mode === 'single') {
@@ -349,7 +349,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputs.suasana.value.trim() ? `suasana ${inputs.suasana.value.trim()}`: '',
             ].filter(Boolean);
             const sceneContext = sceneContextParts.length > 0 ? `// --- Scene Context ---\n${sceneContextParts.join(', ')}` : '';
-
+            
+            // [MODIFIED] Logic for scene interaction block is now implemented
             const interactionBlock = inputs.sceneInteraction.value.trim() ? `// --- Scene Interaction ---\n${inputs.sceneInteraction.value.trim()}` : '';
 
             const charactersBlock = selectedCharacters.length > 0 ? `// --- Characters in Scene ---\n${selectedCharacters.map(c => c.description).join('\n')}` : '';
@@ -361,7 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputs.sudutKamera.value,
                 inputs.kamera.value,
                 sceneContext,
-                interactionBlock,
+                interactionBlock, // Added to the prompt structure
                 charactersBlock,
                 dialogueBlock,
                 inputs.backsound.value.trim() ? `// --- Audio ---\ndengan suara ${inputs.backsound.value.trim()}` : '',
@@ -371,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return promptParts.filter(part => part && part.trim()).join(',\n');
         }
         
+        // --- Single Scene Logic (Unchanged) ---
         const subjectValue = inputs.subjek.value.trim();
         if (subjectValue.includes('// MASTER PROMPT / CHARACTER SHEET')) {
             const promptParts = [
