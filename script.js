@@ -1,3 +1,6 @@
+// Prompt Generator - Versi 1.1.0
+// Disimpan pada: Senin, 23 Juni 2025
+
 // Wait for the DOM to be fully loaded before running the script
 document.addEventListener('DOMContentLoaded', () => {
     
@@ -18,6 +21,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const loadCharacterModal = document.getElementById('loadCharacterModal');
     const closeLoadCharacterBtn = document.getElementById('closeLoadCharacterBtn');
     const characterList = document.getElementById('characterList');
+
+    // --- Scene Mode Selectors ---
+    const singleSceneBtn = document.getElementById('singleSceneBtn');
+    const conversationSceneBtn = document.getElementById('conversationSceneBtn');
+    const singleSceneModeContainer = document.getElementById('singleSceneModeContainer');
+    const conversationSceneModeContainer = document.getElementById('conversationSceneModeContainer');
+    const sceneCharactersList = document.getElementById('sceneCharactersList');
+    const addSceneCharacterBtn = document.getElementById('addSceneCharacterBtn');
+    const dialogueEditor = document.getElementById('dialogueEditor');
+    const addDialogueLineBtn = document.getElementById('addDialogueLineBtn');
 
     // Manual Prompt Form
     const inputs = {
@@ -87,6 +100,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let adOpenedTime = null;
     let singleUploadedImageData = null; 
     let characterImageData = { face: null, clothing: null, accessories: null };
+    let currentSceneMode = 'single';
+    let selectedCharacters = [];
+    let dialogueLines = [];
+
 
     // --- COIN SYSTEM ---
     function saveCoins() {
@@ -222,7 +239,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // --- GEMINI API INTEGRATION (MODIFIED FOR BACKEND) ---
+    // --- GEMINI API INTEGRATION ---
     async function callGeminiAPI(instruction, imageDataArray = []) {
         const parts = [{ text: instruction }];
         imageDataArray.forEach(imgData => {
@@ -250,7 +267,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
         
         if (text) {
-             // Clean markdown and potential JSON artifacts
             return text.replace(/```json/g, '').replace(/```/g, '').trim();
         } else {
             console.log("No valid response text found, full response:", result);
@@ -295,25 +311,114 @@ document.addEventListener('DOMContentLoaded', () => {
             button.textContent = originalButtonText;
         }
     }
+    
+    // --- SCENE MODE LOGIC ---
+    function switchSceneMode(mode) {
+        currentSceneMode = mode;
+        if (mode === 'single') {
+            singleSceneModeContainer.classList.remove('hidden');
+            conversationSceneModeContainer.classList.add('hidden');
+            singleSceneBtn.classList.replace('bg-gray-600', 'bg-indigo-600');
+            singleSceneBtn.classList.replace('hover:bg-gray-700', 'hover:bg-indigo-700');
+            conversationSceneBtn.classList.replace('bg-indigo-600', 'bg-gray-600');
+            conversationSceneBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-gray-700');
+            inputs.kalimat.parentElement.classList.remove('hidden');
+
+        } else if (mode === 'conversation') {
+            singleSceneModeContainer.classList.add('hidden');
+            conversationSceneModeContainer.classList.remove('hidden');
+            conversationSceneBtn.classList.replace('bg-gray-600', 'bg-indigo-600');
+            conversationSceneBtn.classList.replace('hover:bg-gray-700', 'hover:bg-indigo-700');
+            singleSceneBtn.classList.replace('bg-indigo-600', 'bg-gray-600');
+            singleSceneBtn.classList.replace('hover:bg-indigo-700', 'hover:bg-gray-700');
+            inputs.kalimat.parentElement.classList.add('hidden');
+        }
+    }
 
     // --- MANUAL PROMPT LOGIC ---
+    // [MODIFIED] Function now generates prompts for both modes.
     function generateIndonesianPrompt() {
-        let combinedActionExpression = inputs.aksi.value.trim();
+        if (currentSceneMode === 'conversation') {
+            const sceneContextParts = [
+                inputs.tempat.value.trim() ? `di ${inputs.tempat.value.trim()}` : '',
+                inputs.waktu.value.trim() ? `saat ${inputs.waktu.value.trim()}`: '',
+                inputs.pencahayaan.value.trim() ? `dengan pencahayaan ${inputs.pencahayaan.value.trim()}`: '',
+                inputs.suasana.value.trim() ? `suasana ${inputs.suasana.value.trim()}`: '',
+            ].filter(Boolean);
+            const sceneContext = sceneContextParts.length > 0 ? `// --- Scene Context ---\n${sceneContextParts.join(', ')}` : '';
+
+            const charactersBlock = selectedCharacters.length > 0 ? `// --- Characters in Scene ---\n${selectedCharacters.map(c => c.description).join('\n')}` : '';
+
+            const dialogueBlock = dialogueLines.length > 0 ? `// --- Dialogue ---\n${dialogueLines.map(d => `${d.speaker || 'N/A'}: "${d.line || ''}" ${d.tone ? `(${d.tone})` : ''}`.trim()).join('\n')}` : '';
+            
+            const promptParts = [
+                inputs.style.value,
+                inputs.sudutKamera.value,
+                inputs.kamera.value,
+                sceneContext,
+                charactersBlock,
+                dialogueBlock,
+                inputs.backsound.value.trim() ? `// --- Audio ---\ndengan suara ${inputs.backsound.value.trim()}` : '',
+                inputs.detail.value
+            ];
+
+            return promptParts.filter(part => part && part.trim()).join(',\n');
+        }
+        
+        // --- Single Scene Logic (Unchanged) ---
+        const subjectValue = inputs.subjek.value.trim();
+        if (subjectValue.includes('// MASTER PROMPT / CHARACTER SHEET')) {
+            const promptParts = [
+                inputs.style.value,
+                inputs.sudutKamera.value,
+                inputs.kamera.value,
+                subjectValue,
+                inputs.aksi.value.trim() ? `// --- Action/Scene ---\n${inputs.aksi.value.trim()}` : '',
+                inputs.ekspresi.value.trim() ? `dengan ekspresi ${inputs.ekspresi.value.trim()}` : '',
+                inputs.tempat.value.trim() ? `di ${inputs.tempat.value.trim()}` : '',
+                inputs.waktu.value.trim() ? `saat ${inputs.waktu.value.trim()}`: '',
+                inputs.pencahayaan.value.trim() ? `dengan pencahayaan ${inputs.pencahayaan.value.trim()}`: '',
+                inputs.suasana.value.trim() ? `suasana ${inputs.suasana.value.trim()}`: '',
+                inputs.backsound.value.trim() ? `dengan suara ${inputs.backsound.value.trim()}` : '',
+                inputs.kalimat.value.trim() ? `mengucapkan kalimat: "${inputs.kalimat.value.trim()}"` : '',
+                inputs.detail.value
+            ];
+            return promptParts.filter(part => part && part.trim()).join(',\n');
+        }
+
+        let sceneDescription = `sebuah adegan tentang ${subjectValue || 'seseorang'}`;
+        const action = inputs.aksi.value.trim();
         const expression = inputs.ekspresi.value.trim();
-        if (combinedActionExpression && expression) combinedActionExpression += ` dengan ekspresi ${expression}`;
-        else if (expression) combinedActionExpression = expression;
+        if (action && expression) {
+            sceneDescription += ` yang sedang ${action} dengan ekspresi ${expression}`;
+        } else if (action) {
+            sceneDescription += ` yang sedang ${action}`;
+        } else if (expression) {
+            sceneDescription += ` dengan ekspresi ${expression}`;
+        }
+
         const place = inputs.tempat.value.trim();
+        if (place) {
+            sceneDescription += ` di ${place}`;
+        }
+        
         const time = inputs.waktu.value.trim();
-        let locationAndTime = (place && time) ? `${place} saat ${time}` : (place || time);
+        if (time) {
+            sceneDescription += ` saat ${time}`;
+        }
+        
         const promptParts = [
-            inputs.style.value, inputs.sudutKamera.value, inputs.kamera.value, inputs.subjek.value,
-            combinedActionExpression, locationAndTime,
+            inputs.style.value,
+            inputs.sudutKamera.value,
+            inputs.kamera.value,
+            sceneDescription,
             inputs.pencahayaan.value.trim() ? `dengan pencahayaan ${inputs.pencahayaan.value.trim()}`: '',
             inputs.suasana.value.trim() ? `suasana ${inputs.suasana.value.trim()}`: '',
-            inputs.backsound.value.trim() ? `suara ${inputs.backsound.value.trim()} dalam Bahasa Indonesia` : '',
-            inputs.kalimat.value.trim() ? `kalimat diucapkan dalam Bahasa Indonesia: "${inputs.kalimat.value.trim()}"` : '',
+            inputs.backsound.value.trim() ? `dengan suara ${inputs.backsound.value.trim()}` : '',
+            inputs.kalimat.value.trim() ? `mengucapkan kalimat: "${inputs.kalimat.value.trim()}"` : '',
             inputs.detail.value
         ];
+
         return promptParts.filter(part => part && part.trim()).join(', ');
     }
     
@@ -363,7 +468,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- CUSTOM CHARACTER CREATOR LOGIC (Modal) ---
+    // --- CUSTOM CHARACTER CREATOR LOGIC ---
     function handleCharacterImageUpload(event, type) {
         const file = event.target.files[0];
         if (!file) return;
@@ -387,7 +492,6 @@ document.addEventListener('DOMContentLoaded', () => {
         handleApiInteraction(createCharacterBtn, 3, async () => {
             const characterName = prompt("Masukkan nama untuk karakter ini:", "Karakter Baru");
             if (!characterName) {
-                // Refund coins if user cancels the prompt
                 coins += 3;
                 saveCoins();
                 updateCoinDisplay();
@@ -406,13 +510,16 @@ document.addEventListener('DOMContentLoaded', () => {
 - **Kesan & Karakteristik Unik:** Volume (tebal/kempes), Kilau (berkilau/kusam), dan Detail lain (uban, ujung berwarna).`;
             
             let vibeInstruction;
+            let styleGuideline = "";
             if (selectedStyle === 'Fiksi') {
                 vibeInstruction = `- "vibe": berikan deskripsi kesan atau "vibe" keseluruhan, dan tambahkan kata yang mengandung unsur fantasi (contoh: mystical, ethereal, otherworldly).`;
-            } else { // Non Fiksi
+            } else { 
                 vibeInstruction = `- "vibe": berikan deskripsi kesan atau "vibe" keseluruhan, dan pastikan TIDAK ADA kata yang mengandung unsur fantasi (contoh: professional, casual, sporty).`;
+                styleGuideline = `PENTING: Untuk semua deskripsi, gunakan gaya bahasa yang harfiah, objektif, dan apa adanya seperti laporan identifikasi. Hindari penggunaan metafora, perumpamaan, atau bahasa puitis.`;
             }
             
             const faceInstruction = `Berdasarkan gambar wajah yang diunggah, analisis dan kembalikan sebuah objek JSON. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
+${styleGuideline}
 Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair".
 - "identity": berikan deskripsi yang berisi jenis kelamin, perkiraan usia, dan asal negara/etnis (Contoh: "Seorang pria berusia 25 tahun dari Korea").
 - "face_shape": berikan deskripsi yang mencakup bentuk wajah secara keseluruhan (oval, bulat, dll.), dahi, bentuk pipi, garis rahang, dan dagu.
@@ -422,18 +529,16 @@ Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "
 - "hair": berikan satu string tunggal yang merangkum semua detail rambut berdasarkan panduan berikut: ${hairInstruction}.
 - "skin": berikan deskripsi yang mencakup warna kulit (jika tidak alami, sebutkan sebagai 'dengan make up'). Sebutkan juga tanda khusus seperti tahi lalat atau lesung pipi.
 ${vibeInstruction}
-- Untuk kunci lainnya ("demeanor", "facial_hair"), berikan deskripsi yang sesuai.
-- Gaya deskripsi harus untuk karakter '${selectedStyle}'.`;
+- Untuk kunci lainnya ("demeanor", "facial_hair"), berikan deskripsi yang sesuai.`;
             
             apiPromises.push(callGeminiAPI(faceInstruction, [characterImageData.face]));
             
-            // [MODIFIED] Added conditional logic for clothingInstruction.
             if (characterImageData.clothing) {
                 let clothingInstruction;
                 if (selectedStyle === 'Fiksi') {
                     clothingInstruction = `Berdasarkan gambar pakaian, analisis dan kembalikan objek JSON dengan kunci "top" dan "bottom". Pastikan deskripsi mengandung unsur fantasi (contoh: jubah ajaib, armor elf). Balas HANYA dengan objek JSON.`;
-                } else { // Non Fiksi
-                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan deskripsikan sebagai sebuah "kostum" dalam objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON.`;
+                } else {
+                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan deskripsikan sebagai sebuah "pakaian" atau "busana" dalam objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON.`;
                 }
                 apiPromises.push(callGeminiAPI(clothingInstruction, [characterImageData.clothing]));
             } else {
@@ -487,7 +592,7 @@ ${vibeInstruction}
         });
     }
     
-    // --- CHARACTER SHEET LOGIC ---
+    // --- CHARACTER SHEET & DIALOGUE LOGIC ---
     function getSavedCharacters() {
         return JSON.parse(localStorage.getItem('promptGenCharacters')) || [];
     }
@@ -506,7 +611,7 @@ ${vibeInstruction}
         }
 
         const characterName = prompt("Masukkan nama untuk karakter ini:", defaultName);
-        if (!characterName) return; // User cancelled
+        if (!characterName) return;
 
         const characters = getSavedCharacters();
         const existingIndex = characters.findIndex(c => c.name === characterName);
@@ -523,13 +628,21 @@ ${vibeInstruction}
         flashButtonText(saveCharacterBtn, "Karakter Tersimpan!");
     }
     
-    function loadCharacter() {
+    function populateCharacterModal(mode = 'single') {
         const characters = getSavedCharacters();
-        characterList.innerHTML = ''; // Clear previous list
+        characterList.innerHTML = ''; 
+        
+        const existingFooter = loadCharacterModal.querySelector('.modal-footer');
+        if (existingFooter) {
+            existingFooter.remove();
+        }
 
         if (characters.length === 0) {
             characterList.innerHTML = '<p class="text-gray-400">Belum ada karakter yang disimpan.</p>';
-        } else {
+            return;
+        }
+        
+        if (mode === 'single') {
             characters.forEach((char, index) => {
                 const charEl = document.createElement('div');
                 charEl.className = 'flex justify-between items-center p-3 bg-gray-700 rounded-lg';
@@ -550,7 +663,7 @@ ${vibeInstruction}
                     if(confirm(`Apakah Anda yakin ingin menghapus karakter "${char.name}"?`)) {
                         characters.splice(index, 1);
                         localStorage.setItem('promptGenCharacters', JSON.stringify(characters));
-                        loadCharacter(); // Refresh list
+                        populateCharacterModal(mode);
                     }
                 };
                 
@@ -558,8 +671,139 @@ ${vibeInstruction}
                 charEl.appendChild(deleteBtn);
                 characterList.appendChild(charEl);
             });
+        } else if (mode === 'conversation') {
+             characters.forEach((char, index) => {
+                const charEl = document.createElement('div');
+                charEl.className = 'flex items-center p-3 bg-gray-700 rounded-lg';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `char-${index}`;
+                checkbox.value = char.name;
+                if (selectedCharacters.some(sc => sc.name === char.name)) {
+                    checkbox.checked = true;
+                }
+                checkbox.className = 'h-4 w-4 text-indigo-600 bg-gray-600 border-gray-500 rounded focus:ring-indigo-500';
+                
+                const label = document.createElement('label');
+                label.htmlFor = `char-${index}`;
+                label.textContent = char.name;
+                label.className = 'ml-3 block text-sm font-medium text-gray-300';
+                
+                charEl.appendChild(checkbox);
+                charEl.appendChild(label);
+                characterList.appendChild(charEl);
+            });
+            
+            const footer = document.createElement('div');
+            footer.className = 'modal-footer mt-4 pt-4 border-t border-gray-700';
+            const addButton = document.createElement('button');
+            addButton.textContent = 'Tambahkan ke Adegan';
+            addButton.className = 'w-full text-white bg-indigo-600 hover:bg-indigo-700 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors';
+            addButton.onclick = () => {
+                const selectedCheckboxes = characterList.querySelectorAll('input[type="checkbox"]:checked');
+                const newSelectedNames = Array.from(selectedCheckboxes).map(cb => cb.value);
+                
+                selectedCharacters = characters.filter(char => newSelectedNames.includes(char.name));
+
+                renderSceneCharacters();
+                renderDialogueEditor();
+                loadCharacterModal.classList.add('hidden');
+            };
+
+            footer.appendChild(addButton);
+            loadCharacterModal.querySelector('.bg-gray-800').appendChild(footer);
         }
+        
         loadCharacterModal.classList.remove('hidden');
+    }
+
+    // --- Functions for Conversation Mode ---
+    function renderSceneCharacters() {
+        sceneCharactersList.innerHTML = '';
+        if (selectedCharacters.length === 0) {
+            sceneCharactersList.innerHTML = '<p class="text-sm text-gray-400">Belum ada karakter yang ditambahkan.</p>';
+            return;
+        }
+        
+        selectedCharacters.forEach(char => {
+            const charEl = document.createElement('div');
+            charEl.className = 'flex items-center justify-between bg-gray-700 px-3 py-2 rounded-lg';
+            charEl.textContent = char.name;
+            sceneCharactersList.appendChild(charEl);
+        });
+    }
+
+    function addDialogueLine() {
+        dialogueLines.push({ speaker: '', line: '', tone: ''});
+        renderDialogueEditor();
+    }
+
+    function removeDialogueLine(index) {
+        dialogueLines.splice(index, 1);
+        renderDialogueEditor();
+    }
+    
+    // [MODIFIED] Dialogue editor now saves user input to state
+    function renderDialogueEditor() {
+        dialogueEditor.innerHTML = '';
+        if (selectedCharacters.length === 0) {
+            dialogueEditor.innerHTML = '<p class="text-sm text-gray-400 text-center">Tambahkan karakter terlebih dahulu untuk memulai dialog.</p>';
+            return;
+        }
+        
+        dialogueLines.forEach((dialogue, index) => {
+            const lineEl = document.createElement('div');
+            lineEl.className = 'grid grid-cols-1 md:grid-cols-3 gap-2 items-center';
+
+            const speakerSelect = document.createElement('select');
+            speakerSelect.className = 'bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5';
+            const defaultOption = document.createElement('option');
+            defaultOption.value = '';
+            defaultOption.textContent = 'Pilih Pembicara...';
+            speakerSelect.appendChild(defaultOption);
+
+            selectedCharacters.forEach(char => {
+                const option = document.createElement('option');
+                option.value = char.name;
+                option.textContent = char.name;
+                if (dialogue.speaker === char.name) {
+                    option.selected = true;
+                }
+                speakerSelect.appendChild(option);
+            });
+            speakerSelect.onchange = (e) => { dialogueLines[index].speaker = e.target.value; };
+
+            const lineInput = document.createElement('input');
+            lineInput.type = 'text';
+            lineInput.value = dialogue.line;
+            lineInput.placeholder = 'Dialog...';
+            lineInput.className = 'md:col-span-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5';
+            lineInput.oninput = (e) => { dialogueLines[index].line = e.target.value; };
+            
+            const actionContainer = document.createElement('div');
+            actionContainer.className = 'md:col-span-3 grid grid-cols-3 gap-2';
+
+            const toneInput = document.createElement('input');
+            toneInput.type = 'text';
+            toneInput.value = dialogue.tone;
+            toneInput.placeholder = 'Nada/Ekspresi (opsional)...';
+            toneInput.className = 'col-span-2 bg-gray-700 border border-gray-600 text-white text-sm rounded-lg focus:ring-indigo-500 focus:border-indigo-500 block w-full p-2.5';
+            toneInput.oninput = (e) => { dialogueLines[index].tone = e.target.value; };
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.textContent = 'Hapus';
+            deleteBtn.className = 'col-span-1 text-white bg-red-600 hover:bg-red-700 font-medium rounded-lg text-sm px-4 py-2 text-center';
+            deleteBtn.onclick = () => removeDialogueLine(index);
+            
+            actionContainer.appendChild(toneInput);
+            actionContainer.appendChild(deleteBtn);
+
+            lineEl.appendChild(speakerSelect);
+            lineEl.appendChild(lineInput);
+            lineEl.appendChild(actionContainer);
+            dialogueEditor.appendChild(lineEl);
+        });
     }
 
     // --- EVENT LISTENERS INITIALIZATION ---
@@ -581,6 +825,13 @@ ${vibeInstruction}
         flashButtonText(fixPromptEnBtn, 'Segera Hadir!');
     });
 
+    // --- Scene Mode Listeners ---
+    singleSceneBtn.addEventListener('click', () => switchSceneMode('single'));
+    conversationSceneBtn.addEventListener('click', () => switchSceneMode('conversation'));
+    addSceneCharacterBtn.addEventListener('click', () => populateCharacterModal('conversation'));
+    addDialogueLineBtn.addEventListener('click', addDialogueLine);
+
+
     // Listeners for single image description
     imageUploadInput.addEventListener('change', handleSingleImageUpload);
     describeSubjectBtn.addEventListener('click', () => describeSingleImage('subject'));
@@ -597,7 +848,7 @@ ${vibeInstruction}
     
     // Character Sheet Listeners
     saveCharacterBtn.addEventListener('click', saveCharacter);
-    loadCharacterBtn.addEventListener('click', loadCharacter);
+    loadCharacterBtn.addEventListener('click', () => populateCharacterModal('single'));
     closeLoadCharacterBtn.addEventListener('click', () => loadCharacterModal.classList.add('hidden'));
     loadCharacterModal.addEventListener('click', (e) => { if (e.target === loadCharacterModal) loadCharacterModal.classList.add('hidden') });
 
@@ -631,4 +882,8 @@ ${vibeInstruction}
             handleSingleImageUpload({ target: imageUploadInput });
         }
     });
+
+    // Initialize the default view
+    switchSceneMode('single');
+    renderDialogueEditor();
 });
