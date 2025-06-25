@@ -1,4 +1,4 @@
-// Prompt Generator - Versi 1.2.0
+// Prompt Generator - Versi 1.2.1
 // Disimpan pada: Kamis, 26 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
@@ -288,6 +288,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    // [MODIFIED] Added more descriptive error alerting
     async function handleApiInteraction(button, cost, apiFunction) {
         if (coins < cost) {
             noCoinsNotification.classList.remove('hidden');
@@ -304,7 +305,8 @@ document.addEventListener('DOMContentLoaded', () => {
             await apiFunction();
         } catch (error) {
             console.error("API Interaction Error:", error);
-            alert("Terjadi kesalahan saat memproses permintaan. Lihat console untuk detail.");
+            // Provide a more detailed error message to the user
+            alert(`Terjadi kesalahan saat memproses permintaan. Detail: ${error.message}`);
             coins += cost; // Refund coins on failure
             saveCoins();
             updateCoinDisplay();
@@ -320,7 +322,6 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mode === 'single') {
             singleSceneModeContainer.classList.remove('hidden');
             conversationSceneModeContainer.classList.add('hidden');
-            // Update button styles
             singleSceneBtn.classList.replace('bg-gray-600', 'bg-indigo-600');
             singleSceneBtn.classList.replace('hover:bg-gray-700', 'hover:bg-indigo-700');
             conversationSceneBtn.classList.replace('bg-indigo-600', 'bg-gray-600');
@@ -330,7 +331,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (mode === 'conversation') {
             singleSceneModeContainer.classList.add('hidden');
             conversationSceneModeContainer.classList.remove('hidden');
-             // Update button styles
             conversationSceneBtn.classList.replace('bg-gray-600', 'bg-indigo-600');
             conversationSceneBtn.classList.replace('hover:bg-gray-700', 'hover:bg-indigo-700');
             singleSceneBtn.classList.replace('bg-indigo-600', 'bg-gray-600');
@@ -633,7 +633,7 @@ ${vibeInstruction}
         flashButtonText(saveCharacterBtn, "Karakter Tersimpan!");
     }
     
-    // [MODIFIED] loadCharacter is now populateCharacterModal and handles multiple modes
+    // [MODIFIED] populateCharacterModal now handles multiple modes and has a safer footer append
     function populateCharacterModal(mode = 'single') {
         const characters = getSavedCharacters();
         characterList.innerHTML = ''; 
@@ -718,17 +718,16 @@ ${vibeInstruction}
             };
 
             footer.appendChild(addButton);
-            // [FIXED] Safer way to append the footer
-            const modalContent = loadCharacterModal.querySelector('#characterList').parentElement;
+            const modalContent = loadCharacterModal.querySelector('.bg-gray-800 > div:last-of-type');
             if (modalContent) {
-                 modalContent.appendChild(footer);
+                 modalContent.insertAdjacentElement('afterend', footer);
             }
         }
         
         loadCharacterModal.classList.remove('hidden');
     }
 
-    // --- [NEW] Functions for Conversation Mode ---
+    // --- Functions for Conversation Mode ---
     function renderSceneCharacters() {
         sceneCharactersList.innerHTML = '';
         if (selectedCharacters.length === 0) {
@@ -895,3 +894,4 @@ ${vibeInstruction}
     // Initialize the default view
     switchSceneMode('single');
     renderDialogueEditor();
+});
