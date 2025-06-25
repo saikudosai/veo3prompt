@@ -1,5 +1,5 @@
-// Prompt Generator - Versi 1.2.1
-// Disimpan pada: Kamis, 26 Juni 2025
+// Prompt Generator - Versi 1.1.0
+// Disimpan pada: Senin, 23 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
 document.addEventListener('DOMContentLoaded', () => {
@@ -47,7 +47,6 @@ document.addEventListener('DOMContentLoaded', () => {
         backsound: document.getElementById('backsound'),
         kalimat: document.getElementById('kalimat'),
         detail: document.getElementById('detail'),
-        sceneInteraction: document.getElementById('sceneInteraction') // Added for conversation mode
     };
     const generateBtn = document.getElementById('generateBtn');
     const saveCharacterBtn = document.getElementById('saveCharacterBtn');
@@ -101,8 +100,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let adOpenedTime = null;
     let singleUploadedImageData = null; 
     let characterImageData = { face: null, clothing: null, accessories: null };
-    // --- Scene Mode State ---
-    let currentSceneMode = 'single'; // 'single' or 'conversation'
+    let currentSceneMode = 'single';
     let selectedCharacters = [];
     let dialogueLines = [];
 
@@ -288,7 +286,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // [MODIFIED] Added more descriptive error alerting
     async function handleApiInteraction(button, cost, apiFunction) {
         if (coins < cost) {
             noCoinsNotification.classList.remove('hidden');
@@ -305,8 +302,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await apiFunction();
         } catch (error) {
             console.error("API Interaction Error:", error);
-            // Provide a more detailed error message to the user
-            alert(`Terjadi kesalahan saat memproses permintaan. Detail: ${error.message}`);
+            alert("Terjadi kesalahan saat memproses permintaan. Lihat console untuk detail.");
             coins += cost; // Refund coins on failure
             saveCoins();
             updateCoinDisplay();
@@ -340,6 +336,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- MANUAL PROMPT LOGIC ---
+    // [MODIFIED] Function now generates prompts for both modes.
     function generateIndonesianPrompt() {
         if (currentSceneMode === 'conversation') {
             const sceneContextParts = [
@@ -349,8 +346,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputs.suasana.value.trim() ? `suasana ${inputs.suasana.value.trim()}`: '',
             ].filter(Boolean);
             const sceneContext = sceneContextParts.length > 0 ? `// --- Scene Context ---\n${sceneContextParts.join(', ')}` : '';
-            
-            const interactionBlock = inputs.sceneInteraction.value.trim() ? `// --- Scene Interaction ---\n${inputs.sceneInteraction.value.trim()}` : '';
 
             const charactersBlock = selectedCharacters.length > 0 ? `// --- Characters in Scene ---\n${selectedCharacters.map(c => c.description).join('\n')}` : '';
 
@@ -361,7 +356,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputs.sudutKamera.value,
                 inputs.kamera.value,
                 sceneContext,
-                interactionBlock,
                 charactersBlock,
                 dialogueBlock,
                 inputs.backsound.value.trim() ? `// --- Audio ---\ndengan suara ${inputs.backsound.value.trim()}` : '',
@@ -371,6 +365,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return promptParts.filter(part => part && part.trim()).join(',\n');
         }
         
+        // --- Single Scene Logic (Unchanged) ---
         const subjectValue = inputs.subjek.value.trim();
         if (subjectValue.includes('// MASTER PROMPT / CHARACTER SHEET')) {
             const promptParts = [
@@ -633,7 +628,6 @@ ${vibeInstruction}
         flashButtonText(saveCharacterBtn, "Karakter Tersimpan!");
     }
     
-    // [MODIFIED] populateCharacterModal now handles multiple modes and has a safer footer append
     function populateCharacterModal(mode = 'single') {
         const characters = getSavedCharacters();
         characterList.innerHTML = ''; 
@@ -718,10 +712,7 @@ ${vibeInstruction}
             };
 
             footer.appendChild(addButton);
-            const modalContent = loadCharacterModal.querySelector('.bg-gray-800 > div:last-of-type');
-            if (modalContent) {
-                 modalContent.insertAdjacentElement('afterend', footer);
-            }
+            loadCharacterModal.querySelector('.bg-gray-800').appendChild(footer);
         }
         
         loadCharacterModal.classList.remove('hidden');
@@ -753,6 +744,7 @@ ${vibeInstruction}
         renderDialogueEditor();
     }
     
+    // [MODIFIED] Dialogue editor now saves user input to state
     function renderDialogueEditor() {
         dialogueEditor.innerHTML = '';
         if (selectedCharacters.length === 0) {
