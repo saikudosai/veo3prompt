@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeLoadCharacterBtn = document.getElementById('closeLoadCharacterBtn');
     const characterList = document.getElementById('characterList');
 
-    // --- Scene Mode Selectors ---
+    // --- [NEW] Scene Mode Selectors ---
     const singleSceneBtn = document.getElementById('singleSceneBtn');
     const conversationSceneBtn = document.getElementById('conversationSceneBtn');
     const singleSceneModeContainer = document.getElementById('singleSceneModeContainer');
@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         backsound: document.getElementById('backsound'),
         kalimat: document.getElementById('kalimat'),
         detail: document.getElementById('detail'),
+        sceneInteraction: document.getElementById('sceneInteraction') // Added for conversation mode
     };
     const generateBtn = document.getElementById('generateBtn');
     const saveCharacterBtn = document.getElementById('saveCharacterBtn');
@@ -100,7 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let adOpenedTime = null;
     let singleUploadedImageData = null; 
     let characterImageData = { face: null, clothing: null, accessories: null };
-    let currentSceneMode = 'single';
+    // --- [NEW] Scene Mode State ---
+    let currentSceneMode = 'single'; // 'single' or 'conversation'
     let selectedCharacters = [];
     let dialogueLines = [];
 
@@ -312,12 +314,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- SCENE MODE LOGIC ---
+    // --- [NEW] SCENE MODE LOGIC ---
     function switchSceneMode(mode) {
         currentSceneMode = mode;
         if (mode === 'single') {
             singleSceneModeContainer.classList.remove('hidden');
             conversationSceneModeContainer.classList.add('hidden');
+            // Update button styles
             singleSceneBtn.classList.replace('bg-gray-600', 'bg-indigo-600');
             singleSceneBtn.classList.replace('hover:bg-gray-700', 'hover:bg-indigo-700');
             conversationSceneBtn.classList.replace('bg-indigo-600', 'bg-gray-600');
@@ -327,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (mode === 'conversation') {
             singleSceneModeContainer.classList.add('hidden');
             conversationSceneModeContainer.classList.remove('hidden');
+             // Update button styles
             conversationSceneBtn.classList.replace('bg-gray-600', 'bg-indigo-600');
             conversationSceneBtn.classList.replace('hover:bg-gray-700', 'hover:bg-indigo-700');
             singleSceneBtn.classList.replace('bg-indigo-600', 'bg-gray-600');
@@ -336,7 +340,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- MANUAL PROMPT LOGIC ---
-    // [MODIFIED] Function now generates prompts for both modes.
     function generateIndonesianPrompt() {
         if (currentSceneMode === 'conversation') {
             const sceneContextParts = [
@@ -347,6 +350,8 @@ document.addEventListener('DOMContentLoaded', () => {
             ].filter(Boolean);
             const sceneContext = sceneContextParts.length > 0 ? `// --- Scene Context ---\n${sceneContextParts.join(', ')}` : '';
 
+            const interactionBlock = inputs.sceneInteraction.value.trim() ? `// --- Scene Interaction ---\n${inputs.sceneInteraction.value.trim()}` : '';
+
             const charactersBlock = selectedCharacters.length > 0 ? `// --- Characters in Scene ---\n${selectedCharacters.map(c => c.description).join('\n')}` : '';
 
             const dialogueBlock = dialogueLines.length > 0 ? `// --- Dialogue ---\n${dialogueLines.map(d => `${d.speaker || 'N/A'}: "${d.line || ''}" ${d.tone ? `(${d.tone})` : ''}`.trim()).join('\n')}` : '';
@@ -356,6 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputs.sudutKamera.value,
                 inputs.kamera.value,
                 sceneContext,
+                interactionBlock,
                 charactersBlock,
                 dialogueBlock,
                 inputs.backsound.value.trim() ? `// --- Audio ---\ndengan suara ${inputs.backsound.value.trim()}` : '',
@@ -365,7 +371,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return promptParts.filter(part => part && part.trim()).join(',\n');
         }
         
-        // --- Single Scene Logic (Unchanged) ---
         const subjectValue = inputs.subjek.value.trim();
         if (subjectValue.includes('// MASTER PROMPT / CHARACTER SHEET')) {
             const promptParts = [
@@ -744,7 +749,6 @@ ${vibeInstruction}
         renderDialogueEditor();
     }
     
-    // [MODIFIED] Dialogue editor now saves user input to state
     function renderDialogueEditor() {
         dialogueEditor.innerHTML = '';
         if (selectedCharacters.length === 0) {
