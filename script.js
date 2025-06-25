@@ -350,7 +350,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ].filter(Boolean);
             const sceneContext = sceneContextParts.length > 0 ? `// --- Scene Context ---\n${sceneContextParts.join(', ')}` : '';
             
-            // [MODIFIED] Logic for scene interaction block is now implemented
             const interactionBlock = inputs.sceneInteraction.value.trim() ? `// --- Scene Interaction ---\n${inputs.sceneInteraction.value.trim()}` : '';
 
             const charactersBlock = selectedCharacters.length > 0 ? `// --- Characters in Scene ---\n${selectedCharacters.map(c => c.description).join('\n')}` : '';
@@ -362,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputs.sudutKamera.value,
                 inputs.kamera.value,
                 sceneContext,
-                interactionBlock, // Added to the prompt structure
+                interactionBlock,
                 charactersBlock,
                 dialogueBlock,
                 inputs.backsound.value.trim() ? `// --- Audio ---\ndengan suara ${inputs.backsound.value.trim()}` : '',
@@ -372,7 +371,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return promptParts.filter(part => part && part.trim()).join(',\n');
         }
         
-        // --- Single Scene Logic (Unchanged) ---
         const subjectValue = inputs.subjek.value.trim();
         if (subjectValue.includes('// MASTER PROMPT / CHARACTER SHEET')) {
             const promptParts = [
@@ -635,6 +633,7 @@ ${vibeInstruction}
         flashButtonText(saveCharacterBtn, "Karakter Tersimpan!");
     }
     
+    // [MODIFIED] loadCharacter is now populateCharacterModal and handles multiple modes
     function populateCharacterModal(mode = 'single') {
         const characters = getSavedCharacters();
         characterList.innerHTML = ''; 
@@ -719,13 +718,17 @@ ${vibeInstruction}
             };
 
             footer.appendChild(addButton);
-            loadCharacterModal.querySelector('.bg-gray-800').appendChild(footer);
+            // [FIXED] Safer way to append the footer
+            const modalContent = loadCharacterModal.querySelector('#characterList').parentElement;
+            if (modalContent) {
+                 modalContent.appendChild(footer);
+            }
         }
         
         loadCharacterModal.classList.remove('hidden');
     }
 
-    // --- Functions for Conversation Mode ---
+    // --- [NEW] Functions for Conversation Mode ---
     function renderSceneCharacters() {
         sceneCharactersList.innerHTML = '';
         if (selectedCharacters.length === 0) {
@@ -892,4 +895,3 @@ ${vibeInstruction}
     // Initialize the default view
     switchSceneMode('single');
     renderDialogueEditor();
-});
