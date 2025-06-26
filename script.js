@@ -486,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
     
-    // [MODIFIED] Reverted to sequential API calls with a delay to avoid rate-limiting issues.
+    // [MODIFIED] Reverted to sequential API calls with a doubled delay.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
@@ -503,7 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             
-            const delay = ms => new Promise(res => setTimeout(res, ms)); // Helper function for delay
+            const delay = ms => new Promise(res => setTimeout(res, ms)); 
 
             const selectedStyle = characterStyleSelect.value;
             
@@ -537,7 +537,7 @@ ${vibeInstruction}
 - Untuk kunci lainnya ("demeanor", "facial_hair"), berikan deskripsi yang sesuai.`;
             
             const faceResult = await callGeminiAPI(faceInstruction, [characterImageData.face]);
-            await delay(1000); // Wait 1 second
+            await delay(2000); // Wait 2 seconds
 
             let clothingResult = '{}';
             if (characterImageData.clothing) {
@@ -548,7 +548,7 @@ ${vibeInstruction}
                     clothingInstruction = `Berdasarkan gambar pakaian, analisis dan deskripsikan sebagai sebuah "pakaian" atau "busana" dalam objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON.`;
                 }
                 clothingResult = await callGeminiAPI(clothingInstruction, [characterImageData.clothing]);
-                await delay(1000); // Wait 1 second
+                await delay(2000); // Wait 2 seconds
             }
 
             let accessoriesResult = '{}';
