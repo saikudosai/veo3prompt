@@ -1,4 +1,4 @@
-// Prompt Generator - Versi 1.3.2 (Rate Limit Delay Fix)
+// Prompt Generator - Versi 1.4.0 (Exponential Backoff Implemented)
 // Disimpan pada: Kamis, 26 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
@@ -242,38 +242,52 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- GEMINI API INTEGRATION ---
-    async function callGeminiAPI(instruction, imageDataArray = []) {
-        const parts = [{ text: instruction }];
-        imageDataArray.forEach(imgData => {
-            if (imgData) {
-                parts.push({ inline_data: { mime_type: imgData.type, data: imgData.data } });
-            }
-        });
-        
-        const apiUrl = `/api/apigemini`;
-        const payload = { contents: [{ parts: parts }] };
-        
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
+    // [MODIFIED] New API call function with exponential backoff retry mechanism
+    const delay = ms => new Promise(res => setTimeout(res, ms));
 
-        if (!response.ok) {
-            const errorBody = await response.json();
-            console.error("Backend API Error Response:", errorBody);
-            throw new Error(`API error: ${response.status} ${response.statusText}`);
+    async function callGeminiAPIWithRetry(instruction, imageDataArray = [], maxRetries = 4) {
+        let retries = 0;
+        let waitTime = 1000; // Start with 1 second
+
+        while (retries < maxRetries) {
+            const parts = [{ text: instruction }];
+            (imageDataArray || []).forEach(imgData => {
+                if (imgData) {
+                    parts.push({ inline_data: { mime_type: imgData.type, data: imgData.data } });
+                }
+            });
+            
+            const apiUrl = `/api/apigemini`;
+            const payload = { contents: [{ parts: parts }] };
+            
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (response.ok) {
+                const result = await response.json();
+                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (text) {
+                    return text.replace(/```json/g, '').replace(/```/g, '').trim();
+                } else {
+                    throw new Error("Invalid or empty response structure from API.");
+                }
+            } else if (response.status === 429) {
+                retries++;
+                console.warn(`API rate limit hit (429). Retrying in ${waitTime / 1000}s... (Attempt ${retries}/${maxRetries})`);
+                if (retries < maxRetries) {
+                    await delay(waitTime);
+                    waitTime *= 2; // Exponentially increase wait time
+                }
+            } else {
+                const errorBody = await response.text();
+                console.error("Backend API Error Response:", errorBody);
+                throw new Error(`API error: ${response.status} ${response.statusText}. Details: ${errorBody}`);
+            }
         }
-        
-        const result = await response.json();
-        const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-        
-        if (text) {
-            return text.replace(/```json/g, '').replace(/```/g, '').trim();
-        } else {
-            console.log("No valid response text found, full response:", result);
-            throw new Error("Invalid or empty response structure from API.");
-        }
+        throw new Error(`API request failed after ${maxRetries} retries.`);
     }
 
     // --- ACTION HANDLERS ---
@@ -435,7 +449,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const instruction = `Translate the following creative video prompt from Indonesian to English. Keep the structure and comma separation. Be concise and direct. Respond only with the translated prompt. Text to translate: "${indonesianPrompt}"`;
-            promptEnglish.value = await callGeminiAPI(instruction);
+            promptEnglish.value = await callGeminiAPIWithRetry(instruction);
         });
     }
 
@@ -465,7 +479,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const instruction = type === 'subject'
                 ? "Analisis secara spesifik hanya orang/subjek utama dalam gambar ini. Abaikan sepenuhnya latar belakang atau tempat. Berikan deskripsi mendetail dalam Bahasa Indonesia yang mencakup detail wajah, warna dan gaya rambut, pakaian dan aksesoris, warna kulit, dan perkiraan usia. Gabungkan semuanya menjadi satu frasa deskriptif yang kohesif. Balas HANYA dengan frasa deskriptif ini, tanpa teks atau format lain."
                 : "Anda adalah seorang prompt engineer. Analisis gambar ini dan buatlah deskripsi prompt yang sinematik untuk latar belakangnya dalam Bahasa Indonesia. Fokus pada suasana, elemen visual kunci, dan mood. Abaikan orang atau subjek utama. Balas HANYA dengan deskripsi prompt ini, tanpa teks pembuka.";
-            const description = await callGeminiAPI(instruction, [singleUploadedImageData]);
+            const description = await callGeminiAPIWithRetry(instruction, [singleUploadedImageData]);
             const targetInput = type === 'subject' ? inputs.subjek : inputs.tempat;
             targetInput.value = description;
         });
@@ -486,7 +500,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
     
-    // [MODIFIED] Reverted to sequential API calls with a doubled delay.
+    // [MODIFIED] Using the new callGeminiAPIWithRetry function
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
@@ -502,8 +516,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Pembuatan karakter dibatalkan.");
                 return;
             }
-            
-            const delay = ms => new Promise(res => setTimeout(res, ms)); 
 
             const selectedStyle = characterStyleSelect.value;
             
@@ -536,8 +548,7 @@ Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "
 ${vibeInstruction}
 - Untuk kunci lainnya ("demeanor", "facial_hair"), berikan deskripsi yang sesuai.`;
             
-            const faceResult = await callGeminiAPI(faceInstruction, [characterImageData.face]);
-            await delay(2000); // Wait 2 seconds
+            const faceResult = await callGeminiAPIWithRetry(faceInstruction, [characterImageData.face]);
 
             let clothingResult = '{}';
             if (characterImageData.clothing) {
@@ -547,14 +558,13 @@ ${vibeInstruction}
                 } else {
                     clothingInstruction = `Berdasarkan gambar pakaian, analisis dan deskripsikan sebagai sebuah "pakaian" atau "busana" dalam objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON.`;
                 }
-                clothingResult = await callGeminiAPI(clothingInstruction, [characterImageData.clothing]);
-                await delay(2000); // Wait 2 seconds
+                clothingResult = await callGeminiAPIWithRetry(clothingInstruction, [characterImageData.clothing]);
             }
 
             let accessoriesResult = '{}';
             if (characterImageData.accessories) {
                 const accessoriesInstruction = `Berdasarkan gambar aksesori, analisis dan kembalikan objek JSON dengan kunci "accessory". Balas HANYA dengan objek JSON. Jika tidak ada aksesori, nilai harus "none".`;
-                accessoriesResult = await callGeminiAPI(accessoriesInstruction, [characterImageData.accessories]);
+                accessoriesResult = await callGeminiAPIWithRetry(accessoriesInstruction, [characterImageData.accessories]);
             }
 
             try {
