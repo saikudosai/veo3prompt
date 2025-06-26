@@ -1,5 +1,5 @@
-// Prompt Generator - Versi 1.1.0
-// Disimpan pada: Senin, 23 Juni 2025
+// Prompt Generator - Versi Stabil 1.2.0
+// Disimpan pada: Kamis, 26 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
 document.addEventListener('DOMContentLoaded', () => {
@@ -47,6 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         backsound: document.getElementById('backsound'),
         kalimat: document.getElementById('kalimat'),
         detail: document.getElementById('detail'),
+        sceneInteraction: document.getElementById('sceneInteraction') // Added for conversation mode
     };
     const generateBtn = document.getElementById('generateBtn');
     const saveCharacterBtn = document.getElementById('saveCharacterBtn');
@@ -100,7 +101,8 @@ document.addEventListener('DOMContentLoaded', () => {
     let adOpenedTime = null;
     let singleUploadedImageData = null; 
     let characterImageData = { face: null, clothing: null, accessories: null };
-    let currentSceneMode = 'single';
+    // --- Scene Mode State ---
+    let currentSceneMode = 'single'; // 'single' or 'conversation'
     let selectedCharacters = [];
     let dialogueLines = [];
 
@@ -302,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await apiFunction();
         } catch (error) {
             console.error("API Interaction Error:", error);
-            alert("Terjadi kesalahan saat memproses permintaan. Lihat console untuk detail.");
+            alert(`Terjadi kesalahan saat memproses permintaan. Detail: ${error.message}`);
             coins += cost; // Refund coins on failure
             saveCoins();
             updateCoinDisplay();
@@ -336,7 +338,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- MANUAL PROMPT LOGIC ---
-    // [MODIFIED] Function now generates prompts for both modes.
     function generateIndonesianPrompt() {
         if (currentSceneMode === 'conversation') {
             const sceneContextParts = [
@@ -346,6 +347,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputs.suasana.value.trim() ? `suasana ${inputs.suasana.value.trim()}`: '',
             ].filter(Boolean);
             const sceneContext = sceneContextParts.length > 0 ? `// --- Scene Context ---\n${sceneContextParts.join(', ')}` : '';
+            
+            const interactionBlock = inputs.sceneInteraction.value.trim() ? `// --- Scene Interaction ---\n${inputs.sceneInteraction.value.trim()}` : '';
 
             const charactersBlock = selectedCharacters.length > 0 ? `// --- Characters in Scene ---\n${selectedCharacters.map(c => c.description).join('\n')}` : '';
 
@@ -356,6 +359,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 inputs.sudutKamera.value,
                 inputs.kamera.value,
                 sceneContext,
+                interactionBlock,
                 charactersBlock,
                 dialogueBlock,
                 inputs.backsound.value.trim() ? `// --- Audio ---\ndengan suara ${inputs.backsound.value.trim()}` : '',
@@ -365,7 +369,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return promptParts.filter(part => part && part.trim()).join(',\n');
         }
         
-        // --- Single Scene Logic (Unchanged) ---
         const subjectValue = inputs.subjek.value.trim();
         if (subjectValue.includes('// MASTER PROMPT / CHARACTER SHEET')) {
             const promptParts = [
@@ -483,6 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
 
+    // [MODIFIED] Reverted to separate API calls to avoid rate limiting issues.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
@@ -744,7 +748,6 @@ ${vibeInstruction}
         renderDialogueEditor();
     }
     
-    // [MODIFIED] Dialogue editor now saves user input to state
     function renderDialogueEditor() {
         dialogueEditor.innerHTML = '';
         if (selectedCharacters.length === 0) {
