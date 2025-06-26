@@ -1,4 +1,4 @@
-// Prompt Generator - Versi 1.3.1 (Sequential API Call Fix)
+// Prompt Generator - Versi 1.3.2 (Rate Limit Delay Fix)
 // Disimpan pada: Kamis, 26 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
@@ -485,8 +485,8 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         reader.readAsDataURL(file);
     }
-
-    // [MODIFIED] Reverted to sequential API calls to avoid rate-limiting issues.
+    
+    // [MODIFIED] Reverted to sequential API calls with a delay to avoid rate-limiting issues.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
@@ -502,6 +502,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log("Pembuatan karakter dibatalkan.");
                 return;
             }
+            
+            const delay = ms => new Promise(res => setTimeout(res, ms)); // Helper function for delay
 
             const selectedStyle = characterStyleSelect.value;
             
@@ -535,6 +537,7 @@ ${vibeInstruction}
 - Untuk kunci lainnya ("demeanor", "facial_hair"), berikan deskripsi yang sesuai.`;
             
             const faceResult = await callGeminiAPI(faceInstruction, [characterImageData.face]);
+            await delay(1000); // Wait 1 second
 
             let clothingResult = '{}';
             if (characterImageData.clothing) {
@@ -545,6 +548,7 @@ ${vibeInstruction}
                     clothingInstruction = `Berdasarkan gambar pakaian, analisis dan deskripsikan sebagai sebuah "pakaian" atau "busana" dalam objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON.`;
                 }
                 clothingResult = await callGeminiAPI(clothingInstruction, [characterImageData.clothing]);
+                await delay(1000); // Wait 1 second
             }
 
             let accessoriesResult = '{}';
