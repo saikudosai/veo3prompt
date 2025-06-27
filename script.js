@@ -1,5 +1,5 @@
-// Prompt Generator - Versi 1.4.2 (MIME Type Fix)
-// Disimpan pada: Jumat, 27 Juni 2025
+// Prompt Generator - Versi 1.2.0
+// Disimpan pada: Kamis, 26 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
 document.addEventListener('DOMContentLoaded', () => {
@@ -242,51 +242,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- GEMINI API INTEGRATION ---
-    const delay = ms => new Promise(res => setTimeout(res, ms));
-
-    async function callGeminiAPIWithRetry(instruction, imageDataArray = [], maxRetries = 4) {
-        let retries = 0;
-        let waitTime = 1000; 
-
-        while (retries < maxRetries) {
-            const parts = [{ text: instruction }];
-            (imageDataArray || []).forEach(imgData => {
-                if (imgData && imgData.type && imgData.data) { // Added checks for valid image data
-                    parts.push({ inline_data: { mime_type: imgData.type, data: imgData.data } });
-                }
-            });
-            
-            const apiUrl = `/api/apigemini`;
-            const payload = { contents: [{ parts: parts }] };
-            
-            const response = await fetch(apiUrl, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payload)
-            });
-
-            if (response.ok) {
-                const result = await response.json();
-                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
-                if (text) {
-                    return text.replace(/```json/g, '').replace(/```/g, '').trim();
-                } else {
-                    throw new Error("Invalid or empty response structure from API.");
-                }
-            } else if (response.status === 429) {
-                retries++;
-                console.warn(`API rate limit hit (429). Retrying in ${waitTime / 1000}s... (Attempt ${retries}/${maxRetries})`);
-                if (retries < maxRetries) {
-                    await delay(waitTime);
-                    waitTime *= 2; 
-                }
-            } else {
-                const errorBody = await response.text();
-                console.error("Backend API Error Response:", errorBody);
-                throw new Error(`API error: ${response.status} ${response.statusText}. Details: ${errorBody}`);
+    async function callGeminiAPI(instruction, imageDataArray = []) {
+        const parts = [{ text: instruction }];
+        imageDataArray.forEach(imgData => {
+            if (imgData) {
+                parts.push({ inline_data: { mime_type: imgData.type, data: imgData.data } });
             }
+        });
+        
+        const apiUrl = `/api/apigemini`;
+        const payload = { contents: [{ parts: parts }] };
+        
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+            const errorBody = await response.json();
+            console.error("Backend API Error Response:", errorBody);
+            throw new Error(`API error: ${response.status} ${response.statusText}`);
         }
-        throw new Error(`API request failed after ${maxRetries} retries.`);
+        
+        const result = await response.json();
+        const text = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+        
+        if (text) {
+            return text.replace(/```json/g, '').replace(/```/g, '').trim();
+        } else {
+            console.log("No valid response text found, full response:", result);
+            throw new Error("Invalid or empty response structure from API.");
+        }
     }
 
     // --- ACTION HANDLERS ---
@@ -333,6 +320,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (mode === 'single') {
             singleSceneModeContainer.classList.remove('hidden');
             conversationSceneModeContainer.classList.add('hidden');
+            // Update button styles
             singleSceneBtn.classList.replace('bg-gray-600', 'bg-indigo-600');
             singleSceneBtn.classList.replace('hover:bg-gray-700', 'hover:bg-indigo-700');
             conversationSceneBtn.classList.replace('bg-indigo-600', 'bg-gray-600');
@@ -342,6 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (mode === 'conversation') {
             singleSceneModeContainer.classList.add('hidden');
             conversationSceneModeContainer.classList.remove('hidden');
+             // Update button styles
             conversationSceneBtn.classList.replace('bg-gray-600', 'bg-indigo-600');
             conversationSceneBtn.classList.replace('hover:bg-gray-700', 'hover:bg-indigo-700');
             singleSceneBtn.classList.replace('bg-indigo-600', 'bg-gray-600');
@@ -351,6 +340,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- MANUAL PROMPT LOGIC ---
+    // [MODIFIED] This function is now complete for both modes.
     function generateIndonesianPrompt() {
         if (currentSceneMode === 'conversation') {
             const sceneContextParts = [
@@ -382,6 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return promptParts.filter(part => part && part.trim()).join(',\n');
         }
         
+        // --- Single Scene Logic ---
         const subjectValue = inputs.subjek.value.trim();
         if (subjectValue.includes('// MASTER PROMPT / CHARACTER SHEET')) {
             const promptParts = [
@@ -448,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
             const instruction = `Translate the following creative video prompt from Indonesian to English. Keep the structure and comma separation. Be concise and direct. Respond only with the translated prompt. Text to translate: "${indonesianPrompt}"`;
-            promptEnglish.value = await callGeminiAPIWithRetry(instruction);
+            promptEnglish.value = await callGeminiAPI(instruction);
         });
     }
 
@@ -478,7 +469,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const instruction = type === 'subject'
                 ? "Analisis secara spesifik hanya orang/subjek utama dalam gambar ini. Abaikan sepenuhnya latar belakang atau tempat. Berikan deskripsi mendetail dalam Bahasa Indonesia yang mencakup detail wajah, warna dan gaya rambut, pakaian dan aksesoris, warna kulit, dan perkiraan usia. Gabungkan semuanya menjadi satu frasa deskriptif yang kohesif. Balas HANYA dengan frasa deskriptif ini, tanpa teks atau format lain."
                 : "Anda adalah seorang prompt engineer. Analisis gambar ini dan buatlah deskripsi prompt yang sinematik untuk latar belakangnya dalam Bahasa Indonesia. Fokus pada suasana, elemen visual kunci, dan mood. Abaikan orang atau subjek utama. Balas HANYA dengan deskripsi prompt ini, tanpa teks pembuka.";
-            const description = await callGeminiAPIWithRetry(instruction, [singleUploadedImageData]);
+            const description = await callGeminiAPI(instruction, [singleUploadedImageData]);
             const targetInput = type === 'subject' ? inputs.subjek : inputs.tempat;
             targetInput.value = description;
         });
@@ -498,8 +489,7 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         reader.readAsDataURL(file);
     }
-    
-    // [MODIFIED] Using a single, optimized API call.
+
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
@@ -516,6 +506,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
+            const apiPromises = [];
             const selectedStyle = characterStyleSelect.value;
             
             const hairInstruction = `Deskripsikan rambut dengan sangat detail, pecah ke dalam kategori berikut:
@@ -525,36 +516,18 @@ document.addEventListener('DOMContentLoaded', () => {
 - **Gaya & Penataan Rambut:** Penataan (tergerai, ekor kuda, dikepang), Belahan Rambut (tengah, samping), dan Aksesori (jepit, bando).
 - **Kesan & Karakteristik Unik:** Volume (tebal/kempes), Kilau (berkilau/kusam), dan Detail lain (uban, ujung berwarna).`;
             
-            let vibeInstruction, styleGuideline = "", clothingPrompt;
+            let vibeInstruction;
+            let styleGuideline = "";
             if (selectedStyle === 'Fiksi') {
                 vibeInstruction = `- "vibe": berikan deskripsi kesan atau "vibe" keseluruhan, dan tambahkan kata yang mengandung unsur fantasi (contoh: mystical, ethereal, otherworldly).`;
-                clothingPrompt = `- "attire": deskripsikan pakaian secara detail. Pastikan deskripsi mengandung unsur fantasi (contoh: jubah ajaib, armor elf).`;
             } else { 
                 vibeInstruction = `- "vibe": berikan deskripsi kesan atau "vibe" keseluruhan, dan pastikan TIDAK ADA kata yang mengandung unsur fantasi (contoh: professional, casual, sporty).`;
                 styleGuideline = `PENTING: Untuk semua deskripsi, gunakan gaya bahasa yang harfiah, objektif, dan apa adanya seperti laporan identifikasi. Hindari penggunaan metafora, perumpamaan, atau bahasa puitis.`;
-                clothingPrompt = `- "attire": deskripsikan pakaian atau busana secara detail.`;
-            }
-
-            // [FIX] Consolidate all image data into one array and all text into one instruction.
-            const imageDataForApi = [];
-            let imageContextText = "Analisis gambar-gambar berikut:\n";
-
-            if (characterImageData.face) {
-                imageContextText += "1. Gambar Wajah Karakter.\n";
-                imageDataForApi.push(characterImageData.face);
-            }
-            if(characterImageData.clothing) {
-                imageContextText += "2. Gambar Pakaian Karakter.\n";
-                imageDataForApi.push(characterImageData.clothing);
-            }
-            if(characterImageData.accessories) {
-                imageContextText += "3. Gambar Aksesori Karakter.\n";
-                imageDataForApi.push(characterImageData.accessories);
             }
             
-            const mainInstruction = `Berdasarkan gambar-gambar yang diberikan (${imageContextText.trim()}), analisis dan kembalikan sebuah objek JSON tunggal. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
+            const faceInstruction = `Berdasarkan gambar wajah yang diunggah, analisis dan kembalikan sebuah objek JSON. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
 ${styleGuideline}
-Objek JSON harus memiliki semua kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair", "attire", "accessory".
+Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair".
 - "identity": berikan deskripsi yang berisi jenis kelamin, perkiraan usia, dan asal negara/etnis (Contoh: "Seorang pria berusia 25 tahun dari Korea").
 - "face_shape": berikan deskripsi yang mencakup bentuk wajah secara keseluruhan (oval, bulat, dll.), dahi, bentuk pipi, garis rahang, dan dagu.
 - "eyes": berikan deskripsi yang mencakup warna mata (jika warnanya tidak alami tambahkan imbuhan memakai kontak lensa), bentuk mata, ukuran mata, bentuk dan ketebalan alis, serta bulu mata.
@@ -562,44 +535,65 @@ Objek JSON harus memiliki semua kunci berikut: "identity", "demeanor", "vibe", "
 - "lips": berikan deskripsi yang mencakup ketebalan, bentuk bibir, Proporsi Bibir Atas dan Bawah, Bentuk (Cupid's Bow), Lebar Bibir, Bentuk Sudut Bibir, Definisi Garis Bibir.
 - "hair": berikan satu string tunggal yang merangkum semua detail rambut berdasarkan panduan berikut: ${hairInstruction}.
 - "skin": berikan deskripsi yang mencakup warna kulit (jika tidak alami, sebutkan sebagai 'dengan make up'). Sebutkan juga tanda khusus seperti tahi lalat atau lesung pipi.
-${clothingPrompt} Jawaban untuk "attire" harus berupa objek dengan kunci "top" dan "bottom".
-- "accessory": deskripsikan aksesori utama yang terlihat. Jika tidak ada, nilainya harus "none".
 ${vibeInstruction}
 - Untuk kunci lainnya ("demeanor", "facial_hair"), berikan deskripsi yang sesuai.`;
             
-            const resultText = await callGeminiAPIWithRetry(mainInstruction, imageDataForApi);
+            apiPromises.push(callGeminiAPI(faceInstruction, [characterImageData.face]));
+            
+            if (characterImageData.clothing) {
+                let clothingInstruction;
+                if (selectedStyle === 'Fiksi') {
+                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan kembalikan objek JSON dengan kunci "top" dan "bottom". Pastikan deskripsi mengandung unsur fantasi (contoh: jubah ajaib, armor elf). Balas HANYA dengan objek JSON.`;
+                } else {
+                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan deskripsikan sebagai sebuah "pakaian" atau "busana" dalam objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON.`;
+                }
+                apiPromises.push(callGeminiAPI(clothingInstruction, [characterImageData.clothing]));
+            } else {
+                apiPromises.push(Promise.resolve('{}'));
+            }
+
+            if (characterImageData.accessories) {
+                const accessoriesInstruction = `Berdasarkan gambar aksesori, analisis dan kembalikan objek JSON dengan kunci "accessory". Balas HANYA dengan objek JSON. Jika tidak ada aksesori, nilai harus "none".`;
+                apiPromises.push(callGeminiAPI(accessoriesInstruction, [characterImageData.accessories]));
+            } else {
+                apiPromises.push(Promise.resolve('{}'));
+            }
+            
+            const [faceResult, clothingResult, accessoriesResult] = await Promise.all(apiPromises);
 
             try {
-                const data = JSON.parse(resultText);
+                const faceData = JSON.parse(faceResult);
+                const clothingData = JSON.parse(clothingResult);
+                const accessoriesData = JSON.parse(accessoriesResult);
 
                 const finalDescription = `// MASTER PROMPT / CHARACTER SHEET: ${characterName} (v2.0)
 (
     ${characterName.toLowerCase().replace(/ /g, '_')}:
-    identity: ${data.identity || 'not specified'}.
-    demeanor: ${data.demeanor || 'not specified'}.
-    vibe: ${data.vibe || 'not specified'}.
+    identity: ${faceData.identity || 'not specified'}.
+    demeanor: ${faceData.demeanor || 'not specified'}.
+    vibe: ${faceData.vibe || 'not specified'}.
 
     // --- Physical Appearance ---
-    face_shape: ${data.face_shape || 'not specified'}.
-    eyes: ${data.eyes || 'not specified'}.
-    nose: ${data.nose || 'not specified'}.
-    lips: ${data.lips || 'not specified'}.
-    hair: (${data.hair || 'not specified'}:1.2).
-    skin: ${data.skin || 'not specified'}.
-    facial_hair: (${data.facial_hair || 'none'}:1.5).
+    face_shape: ${faceData.face_shape || 'not specified'}.
+    eyes: ${faceData.eyes || 'not specified'}.
+    nose: ${faceData.nose || 'not specified'}.
+    lips: ${faceData.lips || 'not specified'}.
+    hair: (${faceData.hair || 'not specified'}:1.2).
+    skin: ${faceData.skin || 'not specified'}.
+    facial_hair: (${faceData.facial_hair || 'none'}:1.5).
 
     // --- Attire & Accessories ---
     attire:
-        top: ${data.attire?.top || 'not specified'}.
-        bottom: ${data.attire?.bottom || 'not specified'}.
-    accessory: (${data.accessory || 'none'}:1.3).
+        top: ${clothingData.top || 'not specified'}.
+        bottom: ${clothingData.bottom || 'not specified'}.
+    accessory: (${accessoriesData.accessory || 'none'}:1.3).
 )`.trim();
                 
                 inputs.subjek.value = finalDescription;
                 characterCreatorModal.classList.add('hidden');
 
             } catch(e) {
-                console.error("Gagal mem-parsing JSON dari API. Response:", resultText, "Error:", e);
+                console.error("Gagal mem-parsing JSON dari API. Response:", {faceResult, clothingResult, accessoriesResult}, "Error:", e);
                 throw new Error("Gagal membuat Character Sheet karena respons API tidak valid.");
             }
         });
@@ -899,3 +893,4 @@ ${vibeInstruction}
     switchSceneMode('single');
     renderDialogueEditor();
 });
+
