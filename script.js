@@ -1,5 +1,5 @@
-// Prompt Generator - Versi 1.2.0
-// Disimpan pada: Kamis, 26 Juni 2025
+// Prompt Generator - Versi 1.1.0
+// Disimpan pada: Senin, 23 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
 document.addEventListener('DOMContentLoaded', () => {
@@ -22,7 +22,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const closeLoadCharacterBtn = document.getElementById('closeLoadCharacterBtn');
     const characterList = document.getElementById('characterList');
 
-    // --- Scene Mode Selectors ---
+    // --- [NEW] Scene Mode Selectors ---
     const singleSceneBtn = document.getElementById('singleSceneBtn');
     const conversationSceneBtn = document.getElementById('conversationSceneBtn');
     const singleSceneModeContainer = document.getElementById('singleSceneModeContainer');
@@ -101,7 +101,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let adOpenedTime = null;
     let singleUploadedImageData = null; 
     let characterImageData = { face: null, clothing: null, accessories: null };
-    // --- Scene Mode State ---
+    // --- [NEW] Scene Mode State ---
     let currentSceneMode = 'single'; // 'single' or 'conversation'
     let selectedCharacters = [];
     let dialogueLines = [];
@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- ACTION HANDLERS ---
-    const allActionButtons = [generateBtn, fixPromptIdBtn, fixPromptEnBtn, describeSubjectBtn, describePlaceBtn, createCharacterBtn, saveCharacterBtn, loadCharacterBtn];
+    const allActionButtons = [generateBtn, describeSubjectBtn, describePlaceBtn, createCharacterBtn, saveCharacterBtn, loadCharacterBtn];
     function setActionsDisabled(disabled) {
         allActionButtons.forEach(btn => { if(btn) btn.disabled = disabled; });
         if (!disabled) {
@@ -304,7 +304,7 @@ document.addEventListener('DOMContentLoaded', () => {
             await apiFunction();
         } catch (error) {
             console.error("API Interaction Error:", error);
-            alert(`Terjadi kesalahan saat memproses permintaan. Detail: ${error.message}`);
+            alert("Terjadi kesalahan saat memproses permintaan. Lihat console untuk detail.");
             coins += cost; // Refund coins on failure
             saveCoins();
             updateCoinDisplay();
@@ -314,7 +314,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // --- SCENE MODE LOGIC ---
+    // --- [NEW] SCENE MODE LOGIC ---
     function switchSceneMode(mode) {
         currentSceneMode = mode;
         if (mode === 'single') {
@@ -340,36 +340,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- MANUAL PROMPT LOGIC ---
-    // [MODIFIED] This function is now complete for both modes.
     function generateIndonesianPrompt() {
         if (currentSceneMode === 'conversation') {
-            const sceneContextParts = [
-                inputs.tempat.value.trim() ? `di ${inputs.tempat.value.trim()}` : '',
-                inputs.waktu.value.trim() ? `saat ${inputs.waktu.value.trim()}`: '',
-                inputs.pencahayaan.value.trim() ? `dengan pencahayaan ${inputs.pencahayaan.value.trim()}`: '',
-                inputs.suasana.value.trim() ? `suasana ${inputs.suasana.value.trim()}`: '',
-            ].filter(Boolean);
-            const sceneContext = sceneContextParts.length > 0 ? `// --- Scene Context ---\n${sceneContextParts.join(', ')}` : '';
-            
-            const interactionBlock = inputs.sceneInteraction.value.trim() ? `// --- Scene Interaction ---\n${inputs.sceneInteraction.value.trim()}` : '';
-
-            const charactersBlock = selectedCharacters.length > 0 ? `// --- Characters in Scene ---\n${selectedCharacters.map(c => c.description).join('\n')}` : '';
-
-            const dialogueBlock = dialogueLines.length > 0 ? `// --- Dialogue ---\n${dialogueLines.map(d => `${d.speaker || 'N/A'}: "${d.line || ''}" ${d.tone ? `(${d.tone})` : ''}`.trim()).join('\n')}` : '';
-            
-            const promptParts = [
-                inputs.style.value,
-                inputs.sudutKamera.value,
-                inputs.kamera.value,
-                sceneContext,
-                interactionBlock,
-                charactersBlock,
-                dialogueBlock,
-                inputs.backsound.value.trim() ? `// --- Audio ---\ndengan suara ${inputs.backsound.value.trim()}` : '',
-                inputs.detail.value
-            ];
-
-            return promptParts.filter(part => part && part.trim()).join(',\n');
+            // TODO: Implement conversation prompt generation in Tahap 3
+            return "Mode Percakapan Belum Diimplementasikan";
         }
         
         // --- Single Scene Logic ---
@@ -434,7 +408,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const indonesianPrompt = generateIndonesianPrompt();
             promptIndonesia.value = indonesianPrompt;
             promptEnglish.value = 'Menerjemahkan...';
-            if (!indonesianPrompt) {
+            if (!indonesianPrompt || indonesianPrompt === "Mode Percakapan Belum Diimplementasikan") {
                 promptEnglish.value = '';
                 return;
             }
@@ -540,13 +514,38 @@ ${vibeInstruction}
             
             apiPromises.push(callGeminiAPI(faceInstruction, [characterImageData.face]));
             
+            // [MODIFIED] Switched to the new, more detailed clothing instruction
             if (characterImageData.clothing) {
-                let clothingInstruction;
-                if (selectedStyle === 'Fiksi') {
-                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan kembalikan objek JSON dengan kunci "top" dan "bottom". Pastikan deskripsi mengandung unsur fantasi (contoh: jubah ajaib, armor elf). Balas HANYA dengan objek JSON.`;
-                } else {
-                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan deskripsikan sebagai sebuah "pakaian" atau "busana" dalam objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON.`;
-                }
+                const clothingInstruction = `Anda adalah seorang analis fashion. Berdasarkan gambar pakaian yang diberikan, deskripsikan secara detail dengan memecahnya ke dalam kategori-kategori berikut. Gabungkan semua poin menjadi satu kalimat deskriptif yang mengalir, bukan sebagai daftar.
+
+1.  **Kategori Umum:**
+    * **Jenis Pakaian:** Identifikasi jenis utama pakaian (misalnya: setelan formal, gaun malam, pakaian kasual, seragam sekolah).
+    * **Gaya Keseluruhan:** Deskripsikan gaya umumnya (misalnya: modern, vintage, minimalis, bohemian, sporty).
+
+2.  **Deskripsi Atasan (Top):**
+    * **Jenis Atasan:** Kemeja, kaos, blus, tank top, crop top, turtleneck, dll.
+    * **Warna & Pola:** Sebutkan warna dominan, warna aksen, dan pola jika ada (garis-garis, kotak-kotak, bunga, abstrak).
+    * **Model Kerah:** V-neck, kerah bulat, kerah kemeja, sabrina (off-shoulder).
+    * **Model Lengan:** Lengan panjang, lengan pendek, tanpa lengan, lengan puff.
+    * **Detail Atasan:** Kancing, ritsleting, saku, renda, bordir.
+
+3.  **Deskripsi Bawahan (Bottom):** (Jika terlihat)
+    * **Jenis Bawahan:** Celana panjang, rok, celana pendek, jeans, legging.
+    * **Warna & Pola:** Sama seperti atasan.
+    * **Model Potongan:** Slim-fit, regular-fit, loose, cutbray, rok A-line, rok pensil.
+
+4.  **Deskripsi Terusan (One-Piece):** (Jika ini adalah pakaian terusan)
+    * **Jenis:** Gaun, jumpsuit, overall.
+    * **Panjang:** Mini, midi, maxi.
+    * **Model Potongan:** Bodycon, A-line, ball gown.
+
+5.  **Deskripsi Luaran (Outerwear):** (Jika ada)
+    * **Jenis:** Jaket, mantel, blazer, kardigan, rompi.
+    * **Warna & Pola:** Sama seperti atasan.
+
+6.  **Bahan & Tekstur:**
+    * Deskripsikan perkiraan bahan atau teksturnya (misalnya: terlihat seperti katun yang lembut, denim yang kaku, sutra yang mengkilap, wol yang tebal).`;
+
                 apiPromises.push(callGeminiAPI(clothingInstruction, [characterImageData.clothing]));
             } else {
                 apiPromises.push(Promise.resolve('{}'));
@@ -563,7 +562,8 @@ ${vibeInstruction}
 
             try {
                 const faceData = JSON.parse(faceResult);
-                const clothingData = JSON.parse(clothingResult);
+                // Note: clothingResult is now a descriptive string, not a JSON object
+                const clothingDescription = clothingResult; 
                 const accessoriesData = JSON.parse(accessoriesResult);
 
                 const finalDescription = `// MASTER PROMPT / CHARACTER SHEET: ${characterName} (v2.0)
@@ -583,9 +583,7 @@ ${vibeInstruction}
     facial_hair: (${faceData.facial_hair || 'none'}:1.5).
 
     // --- Attire & Accessories ---
-    attire:
-        top: ${clothingData.top || 'not specified'}.
-        bottom: ${clothingData.bottom || 'not specified'}.
+    attire: ${clothingDescription || 'not specified'}.
     accessory: (${accessoriesData.accessory || 'none'}:1.3).
 )`.trim();
                 
@@ -893,4 +891,3 @@ ${vibeInstruction}
     switchSceneMode('single');
     renderDialogueEditor();
 });
-
