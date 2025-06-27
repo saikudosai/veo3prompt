@@ -1,4 +1,4 @@
-// Prompt Generator - Versi 1.4.1 (Single API Call Optimization)
+// Prompt Generator - Versi 1.4.2 (MIME Type Fix)
 // Disimpan pada: Jumat, 27 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
@@ -251,7 +251,7 @@ document.addEventListener('DOMContentLoaded', () => {
         while (retries < maxRetries) {
             const parts = [{ text: instruction }];
             (imageDataArray || []).forEach(imgData => {
-                if (imgData) {
+                if (imgData && imgData.type && imgData.data) { // Added checks for valid image data
                     parts.push({ inline_data: { mime_type: imgData.type, data: imgData.data } });
                 }
             });
@@ -499,7 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
     
-    // [MODIFIED] Now uses a single API call to prevent rate-limiting issues.
+    // [MODIFIED] Using a single, optimized API call.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
@@ -535,20 +535,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 clothingPrompt = `- "attire": deskripsikan pakaian atau busana secara detail.`;
             }
 
-            const imageParts = [];
-            imageParts.push({ text: "Ini adalah gambar wajah karakter:" });
-            imageParts.push(characterImageData.face);
+            // [FIX] Consolidate all image data into one array and all text into one instruction.
+            const imageDataForApi = [];
+            let imageContextText = "Analisis gambar-gambar berikut:\n";
 
-            if(characterImageData.clothing) {
-                imageParts.push({ text: "Ini adalah gambar pakaian karakter:" });
-                imageParts.push(characterImageData.clothing);
+            if (characterImageData.face) {
+                imageContextText += "1. Gambar Wajah Karakter.\n";
+                imageDataForApi.push(characterImageData.face);
             }
-             if(characterImageData.accessories) {
-                imageParts.push({ text: "Ini adalah gambar aksesori karakter:" });
-                imageParts.push(characterImageData.accessories);
+            if(characterImageData.clothing) {
+                imageContextText += "2. Gambar Pakaian Karakter.\n";
+                imageDataForApi.push(characterImageData.clothing);
+            }
+            if(characterImageData.accessories) {
+                imageContextText += "3. Gambar Aksesori Karakter.\n";
+                imageDataForApi.push(characterImageData.accessories);
             }
             
-            const mainInstruction = `Berdasarkan gambar-gambar yang diberikan, analisis dan kembalikan sebuah objek JSON tunggal. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
+            const mainInstruction = `Berdasarkan gambar-gambar yang diberikan (${imageContextText.trim()}), analisis dan kembalikan sebuah objek JSON tunggal. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
 ${styleGuideline}
 Objek JSON harus memiliki semua kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair", "attire", "accessory".
 - "identity": berikan deskripsi yang berisi jenis kelamin, perkiraan usia, dan asal negara/etnis (Contoh: "Seorang pria berusia 25 tahun dari Korea").
@@ -563,7 +567,7 @@ ${clothingPrompt} Jawaban untuk "attire" harus berupa objek dengan kunci "top" d
 ${vibeInstruction}
 - Untuk kunci lainnya ("demeanor", "facial_hair"), berikan deskripsi yang sesuai.`;
             
-            const resultText = await callGeminiAPIWithRetry(mainInstruction, imageParts);
+            const resultText = await callGeminiAPIWithRetry(mainInstruction, imageDataForApi);
 
             try {
                 const data = JSON.parse(resultText);
