@@ -496,6 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
     
+    // [MODIFIED] Using a single, optimized API call.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
@@ -512,7 +513,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return;
             }
 
-            const apiPromises = [];
             const selectedStyle = characterStyleSelect.value;
             
             const hairInstruction = `Deskripsikan rambut dengan sangat detail, pecah ke dalam kategori berikut:
@@ -522,18 +522,35 @@ document.addEventListener('DOMContentLoaded', () => {
 - **Gaya & Penataan Rambut:** Penataan (tergerai, ekor kuda, dikepang), Belahan Rambut (tengah, samping), dan Aksesori (jepit, bando).
 - **Kesan & Karakteristik Unik:** Volume (tebal/kempes), Kilau (berkilau/kusam), dan Detail lain (uban, ujung berwarna).`;
             
-            let vibeInstruction;
-            let styleGuideline = "";
+            let vibeInstruction, styleGuideline = "", clothingPrompt;
             if (selectedStyle === 'Fiksi') {
                 vibeInstruction = `- "vibe": berikan deskripsi kesan atau "vibe" keseluruhan, dan tambahkan kata yang mengandung unsur fantasi (contoh: mystical, ethereal, otherworldly).`;
+                clothingPrompt = `- "attire": deskripsikan pakaian secara detail. Pastikan deskripsi mengandung unsur fantasi (contoh: jubah ajaib, armor elf).`;
             } else { 
                 vibeInstruction = `- "vibe": berikan deskripsi kesan atau "vibe" keseluruhan, dan pastikan TIDAK ADA kata yang mengandung unsur fantasi (contoh: professional, casual, sporty).`;
                 styleGuideline = `PENTING: Untuk semua deskripsi, gunakan gaya bahasa yang harfiah, objektif, dan apa adanya seperti laporan identifikasi. Hindari penggunaan metafora, perumpamaan, atau bahasa puitis.`;
+                clothingPrompt = `- "attire": deskripsikan pakaian atau busana secara detail.`;
+            }
+
+            const imageDataForApi = [];
+            let imageContextText = "Analisis gambar-gambar berikut:\n";
+
+            if (characterImageData.face) {
+                imageContextText += "1. Gambar Wajah Karakter.\n";
+                imageDataForApi.push(characterImageData.face);
+            }
+            if(characterImageData.clothing) {
+                imageContextText += "2. Gambar Pakaian Karakter.\n";
+                imageDataForApi.push(characterImageData.clothing);
+            }
+            if(characterImageData.accessories) {
+                imageContextText += "3. Gambar Aksesori Karakter.\n";
+                imageDataForApi.push(characterImageData.accessories);
             }
             
-            const faceInstruction = `Berdasarkan gambar wajah yang diunggah, analisis dan kembalikan sebuah objek JSON. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
+            const mainInstruction = `Berdasarkan gambar-gambar yang diberikan (${imageContextText.trim()}), analisis dan kembalikan sebuah objek JSON tunggal. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
 ${styleGuideline}
-Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair".
+Objek JSON harus memiliki semua kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair", "attire", "accessory".
 - "identity": berikan deskripsi yang berisi jenis kelamin, perkiraan usia, dan asal negara/etnis (Contoh: "Seorang pria berusia 25 tahun dari Korea").
 - "face_shape": berikan deskripsi yang mencakup bentuk wajah secara keseluruhan (oval, bulat, dll.), dahi, bentuk pipi, garis rahang, dan dagu.
 - "eyes": berikan deskripsi yang mencakup warna mata (jika warnanya tidak alami tambahkan imbuhan memakai kontak lensa), bentuk mata, ukuran mata, bentuk dan ketebalan alis, serta bulu mata.
@@ -541,87 +558,44 @@ Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "
 - "lips": berikan deskripsi yang mencakup ketebalan, bentuk bibir, Proporsi Bibir Atas dan Bawah, Bentuk (Cupid's Bow), Lebar Bibir, Bentuk Sudut Bibir, Definisi Garis Bibir.
 - "hair": berikan satu string tunggal yang merangkum semua detail rambut berdasarkan panduan berikut: ${hairInstruction}.
 - "skin": berikan deskripsi yang mencakup warna kulit (jika tidak alami, sebutkan sebagai 'dengan make up'). Sebutkan juga tanda khusus seperti tahi lalat atau lesung pipi.
+${clothingPrompt} Jawaban untuk "attire" harus berupa objek dengan kunci "top" dan "bottom".
+- "accessory": deskripsikan aksesori utama yang terlihat. Jika tidak ada, nilainya harus "none".
 ${vibeInstruction}
 - Untuk kunci lainnya ("demeanor", "facial_hair"), berikan deskripsi yang sesuai.`;
             
-            apiPromises.push(callGeminiAPIWithRetry(faceInstruction, [characterImageData.face]));
-            
-            // [MODIFIED] Switched to the new, more detailed clothing instruction
-            if (characterImageData.clothing) {
-                const clothingInstruction = `Anda adalah seorang analis fashion. Berdasarkan gambar pakaian yang diberikan, deskripsikan secara detail dengan memecahnya ke dalam kategori-kategori berikut. Gabungkan semua poin menjadi satu kalimat deskriptif yang mengalir, bukan sebagai daftar.
-
-1.  **Kategori Umum:**
-    * **Jenis Pakaian:** Identifikasi jenis utama pakaian (misalnya: setelan formal, gaun malam, pakaian kasual, seragam sekolah).
-    * **Gaya Keseluruhan:** Deskripsikan gaya umumnya (misalnya: modern, vintage, minimalis, bohemian, sporty).
-
-2.  **Deskripsi Atasan (Top):**
-    * **Jenis Atasan:** Kemeja, kaos, blus, tank top, crop top, turtleneck, dll.
-    * **Warna & Pola:** Sebutkan warna dominan, warna aksen, dan pola jika ada (garis-garis, kotak-kotak, bunga, abstrak).
-    * **Model Kerah:** V-neck, kerah bulat, kerah kemeja, sabrina (off-shoulder).
-    * **Model Lengan:** Lengan panjang, lengan pendek, tanpa lengan, lengan puff.
-    * **Detail Atasan:** Kancing, ritsleting, saku, renda, bordir.
-
-3.  **Deskripsi Bawahan (Bottom):** (Jika terlihat)
-    * **Jenis Bawahan:** Celana panjang, rok, celana pendek, jeans, legging.
-    * **Warna & Pola:** Sama seperti atasan.
-    * **Model Potongan:** Slim-fit, regular-fit, loose, cutbray, rok A-line, rok pensil.
-
-4.  **Deskripsi Terusan (One-Piece):** (Jika ini adalah pakaian terusan)
-    * **Jenis:** Gaun, jumpsuit, overall.
-    * **Panjang:** Mini, midi, maxi.
-    * **Model Potongan:** Bodycon, A-line, ball gown.
-
-5.  **Deskripsi Luaran (Outerwear):** (Jika ada)
-    * **Jenis:** Jaket, mantel, blazer, kardigan, rompi.
-    * **Warna & Pola:** Sama seperti atasan.
-
-6.  **Bahan & Tekstur:**
-    * Deskripsikan perkiraan bahan atau teksturnya (misalnya: terlihat seperti katun yang lembut, denim yang kaku, sutra yang mengkilap, wol yang tebal).`;
-
-                apiPromises.push(callGeminiAPIWithRetry(clothingInstruction, [characterImageData.clothing]));
-            } else {
-                apiPromises.push(Promise.resolve(null));
-            }
-
-            if (characterImageData.accessories) {
-                const accessoriesInstruction = `Berdasarkan gambar aksesori, analisis dan kembalikan objek JSON dengan kunci "accessory". Balas HANYA dengan objek JSON. Jika tidak ada aksesori, nilai harus "none".`;
-                apiPromises.push(callGeminiAPIWithRetry(accessoriesInstruction, [characterImageData.accessories]));
-            } else {
-                apiPromises.push(Promise.resolve('{}'));
-            }
-            
-            const [faceResult, clothingDescription, accessoriesResult] = await Promise.all(apiPromises);
+            const resultText = await callGeminiAPIWithRetry(mainInstruction, imageDataForApi);
 
             try {
-                const faceData = JSON.parse(faceResult);
-                const accessoriesData = JSON.parse(accessoriesResult);
+                const data = JSON.parse(resultText);
 
                 const finalDescription = `// MASTER PROMPT / CHARACTER SHEET: ${characterName} (v2.0)
 (
     ${characterName.toLowerCase().replace(/ /g, '_')}:
-    identity: ${faceData.identity || 'not specified'}.
-    demeanor: ${faceData.demeanor || 'not specified'}.
-    vibe: ${faceData.vibe || 'not specified'}.
+    identity: ${data.identity || 'not specified'}.
+    demeanor: ${data.demeanor || 'not specified'}.
+    vibe: ${data.vibe || 'not specified'}.
 
     // --- Physical Appearance ---
-    face_shape: ${faceData.face_shape || 'not specified'}.
-    eyes: ${faceData.eyes || 'not specified'}.
-    nose: ${faceData.nose || 'not specified'}.
-    lips: ${faceData.lips || 'not specified'}.
-    hair: (${faceData.hair || 'not specified'}:1.2).
-    skin: ${faceData.skin || 'not specified'}.
-    facial_hair: (${faceData.facial_hair || 'none'}:1.5).
+    face_shape: ${data.face_shape || 'not specified'}.
+    eyes: ${data.eyes || 'not specified'}.
+    nose: ${data.nose || 'not specified'}.
+    lips: ${data.lips || 'not specified'}.
+    hair: (${data.hair || 'not specified'}:1.2).
+    skin: ${data.skin || 'not specified'}.
+    facial_hair: (${data.facial_hair || 'none'}:1.5).
 
     // --- Attire & Accessories ---
-    attire: ${clothingDescription || 'not specified'}.
-    accessory: (${accessoriesData.accessory || 'none'}:1.3).
+    attire:
+        top: ${data.attire?.top || 'not specified'}.
+        bottom: ${data.attire?.bottom || 'not specified'}.
+    accessory: (${data.accessory || 'none'}:1.3).
 )`.trim();
                 
                 inputs.subjek.value = finalDescription;
                 characterCreatorModal.classList.add('hidden');
 
             } catch(e) {
-                console.error("Gagal mem-parsing JSON dari API. Response:", {faceResult, clothingDescription, accessoriesResult}, "Error:", e);
+                console.error("Gagal mem-parsing JSON dari API. Response:", resultText, "Error:", e);
                 throw new Error("Gagal membuat Character Sheet karena respons API tidak valid.");
             }
         });
