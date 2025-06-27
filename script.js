@@ -1,5 +1,5 @@
-// Prompt Generator - Versi 1.4.0 (Exponential Backoff Implemented)
-// Disimpan pada: Kamis, 26 Juni 2025
+// Prompt Generator - Versi 1.4.1 (Single API Call Optimization)
+// Disimpan pada: Jumat, 27 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
 document.addEventListener('DOMContentLoaded', () => {
@@ -242,12 +242,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
     // --- GEMINI API INTEGRATION ---
-    // [MODIFIED] New API call function with exponential backoff retry mechanism
     const delay = ms => new Promise(res => setTimeout(res, ms));
 
     async function callGeminiAPIWithRetry(instruction, imageDataArray = [], maxRetries = 4) {
         let retries = 0;
-        let waitTime = 1000; // Start with 1 second
+        let waitTime = 1000; 
 
         while (retries < maxRetries) {
             const parts = [{ text: instruction }];
@@ -279,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.warn(`API rate limit hit (429). Retrying in ${waitTime / 1000}s... (Attempt ${retries}/${maxRetries})`);
                 if (retries < maxRetries) {
                     await delay(waitTime);
-                    waitTime *= 2; // Exponentially increase wait time
+                    waitTime *= 2; 
                 }
             } else {
                 const errorBody = await response.text();
@@ -500,7 +499,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
     
-    // [MODIFIED] Using the new callGeminiAPIWithRetry function
+    // [MODIFIED] Now uses a single API call to prevent rate-limiting issues.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
@@ -526,18 +525,32 @@ document.addEventListener('DOMContentLoaded', () => {
 - **Gaya & Penataan Rambut:** Penataan (tergerai, ekor kuda, dikepang), Belahan Rambut (tengah, samping), dan Aksesori (jepit, bando).
 - **Kesan & Karakteristik Unik:** Volume (tebal/kempes), Kilau (berkilau/kusam), dan Detail lain (uban, ujung berwarna).`;
             
-            let vibeInstruction;
-            let styleGuideline = "";
+            let vibeInstruction, styleGuideline = "", clothingPrompt;
             if (selectedStyle === 'Fiksi') {
                 vibeInstruction = `- "vibe": berikan deskripsi kesan atau "vibe" keseluruhan, dan tambahkan kata yang mengandung unsur fantasi (contoh: mystical, ethereal, otherworldly).`;
+                clothingPrompt = `- "attire": deskripsikan pakaian secara detail. Pastikan deskripsi mengandung unsur fantasi (contoh: jubah ajaib, armor elf).`;
             } else { 
                 vibeInstruction = `- "vibe": berikan deskripsi kesan atau "vibe" keseluruhan, dan pastikan TIDAK ADA kata yang mengandung unsur fantasi (contoh: professional, casual, sporty).`;
                 styleGuideline = `PENTING: Untuk semua deskripsi, gunakan gaya bahasa yang harfiah, objektif, dan apa adanya seperti laporan identifikasi. Hindari penggunaan metafora, perumpamaan, atau bahasa puitis.`;
+                clothingPrompt = `- "attire": deskripsikan pakaian atau busana secara detail.`;
+            }
+
+            const imageParts = [];
+            imageParts.push({ text: "Ini adalah gambar wajah karakter:" });
+            imageParts.push(characterImageData.face);
+
+            if(characterImageData.clothing) {
+                imageParts.push({ text: "Ini adalah gambar pakaian karakter:" });
+                imageParts.push(characterImageData.clothing);
+            }
+             if(characterImageData.accessories) {
+                imageParts.push({ text: "Ini adalah gambar aksesori karakter:" });
+                imageParts.push(characterImageData.accessories);
             }
             
-            const faceInstruction = `Berdasarkan gambar wajah yang diunggah, analisis dan kembalikan sebuah objek JSON. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
+            const mainInstruction = `Berdasarkan gambar-gambar yang diberikan, analisis dan kembalikan sebuah objek JSON tunggal. Balas HANYA dengan objek JSON, tanpa teks atau format lain.
 ${styleGuideline}
-Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair".
+Objek JSON harus memiliki semua kunci berikut: "identity", "demeanor", "vibe", "face_shape", "eyes", "nose", "lips", "hair", "skin", "facial_hair", "attire", "accessory".
 - "identity": berikan deskripsi yang berisi jenis kelamin, perkiraan usia, dan asal negara/etnis (Contoh: "Seorang pria berusia 25 tahun dari Korea").
 - "face_shape": berikan deskripsi yang mencakup bentuk wajah secara keseluruhan (oval, bulat, dll.), dahi, bentuk pipi, garis rahang, dan dagu.
 - "eyes": berikan deskripsi yang mencakup warna mata (jika warnanya tidak alami tambahkan imbuhan memakai kontak lensa), bentuk mata, ukuran mata, bentuk dan ketebalan alis, serta bulu mata.
@@ -545,61 +558,44 @@ Objek JSON harus memiliki kunci-kunci berikut: "identity", "demeanor", "vibe", "
 - "lips": berikan deskripsi yang mencakup ketebalan, bentuk bibir, Proporsi Bibir Atas dan Bawah, Bentuk (Cupid's Bow), Lebar Bibir, Bentuk Sudut Bibir, Definisi Garis Bibir.
 - "hair": berikan satu string tunggal yang merangkum semua detail rambut berdasarkan panduan berikut: ${hairInstruction}.
 - "skin": berikan deskripsi yang mencakup warna kulit (jika tidak alami, sebutkan sebagai 'dengan make up'). Sebutkan juga tanda khusus seperti tahi lalat atau lesung pipi.
+${clothingPrompt} Jawaban untuk "attire" harus berupa objek dengan kunci "top" dan "bottom".
+- "accessory": deskripsikan aksesori utama yang terlihat. Jika tidak ada, nilainya harus "none".
 ${vibeInstruction}
 - Untuk kunci lainnya ("demeanor", "facial_hair"), berikan deskripsi yang sesuai.`;
             
-            const faceResult = await callGeminiAPIWithRetry(faceInstruction, [characterImageData.face]);
-
-            let clothingResult = '{}';
-            if (characterImageData.clothing) {
-                let clothingInstruction;
-                if (selectedStyle === 'Fiksi') {
-                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan kembalikan objek JSON dengan kunci "top" dan "bottom". Pastikan deskripsi mengandung unsur fantasi (contoh: jubah ajaib, armor elf). Balas HANYA dengan objek JSON.`;
-                } else {
-                    clothingInstruction = `Berdasarkan gambar pakaian, analisis dan deskripsikan sebagai sebuah "pakaian" atau "busana" dalam objek JSON dengan kunci "top" dan "bottom". Balas HANYA dengan objek JSON.`;
-                }
-                clothingResult = await callGeminiAPIWithRetry(clothingInstruction, [characterImageData.clothing]);
-            }
-
-            let accessoriesResult = '{}';
-            if (characterImageData.accessories) {
-                const accessoriesInstruction = `Berdasarkan gambar aksesori, analisis dan kembalikan objek JSON dengan kunci "accessory". Balas HANYA dengan objek JSON. Jika tidak ada aksesori, nilai harus "none".`;
-                accessoriesResult = await callGeminiAPIWithRetry(accessoriesInstruction, [characterImageData.accessories]);
-            }
+            const resultText = await callGeminiAPIWithRetry(mainInstruction, imageParts);
 
             try {
-                const faceData = JSON.parse(faceResult);
-                const clothingData = JSON.parse(clothingResult);
-                const accessoriesData = JSON.parse(accessoriesResult);
+                const data = JSON.parse(resultText);
 
                 const finalDescription = `// MASTER PROMPT / CHARACTER SHEET: ${characterName} (v2.0)
 (
     ${characterName.toLowerCase().replace(/ /g, '_')}:
-    identity: ${faceData.identity || 'not specified'}.
-    demeanor: ${faceData.demeanor || 'not specified'}.
-    vibe: ${faceData.vibe || 'not specified'}.
+    identity: ${data.identity || 'not specified'}.
+    demeanor: ${data.demeanor || 'not specified'}.
+    vibe: ${data.vibe || 'not specified'}.
 
     // --- Physical Appearance ---
-    face_shape: ${faceData.face_shape || 'not specified'}.
-    eyes: ${faceData.eyes || 'not specified'}.
-    nose: ${faceData.nose || 'not specified'}.
-    lips: ${faceData.lips || 'not specified'}.
-    hair: (${faceData.hair || 'not specified'}:1.2).
-    skin: ${faceData.skin || 'not specified'}.
-    facial_hair: (${faceData.facial_hair || 'none'}:1.5).
+    face_shape: ${data.face_shape || 'not specified'}.
+    eyes: ${data.eyes || 'not specified'}.
+    nose: ${data.nose || 'not specified'}.
+    lips: ${data.lips || 'not specified'}.
+    hair: (${data.hair || 'not specified'}:1.2).
+    skin: ${data.skin || 'not specified'}.
+    facial_hair: (${data.facial_hair || 'none'}:1.5).
 
     // --- Attire & Accessories ---
     attire:
-        top: ${clothingData.top || 'not specified'}.
-        bottom: ${clothingData.bottom || 'not specified'}.
-    accessory: (${accessoriesData.accessory || 'none'}:1.3).
+        top: ${data.attire?.top || 'not specified'}.
+        bottom: ${data.attire?.bottom || 'not specified'}.
+    accessory: (${data.accessory || 'none'}:1.3).
 )`.trim();
                 
                 inputs.subjek.value = finalDescription;
                 characterCreatorModal.classList.add('hidden');
 
             } catch(e) {
-                console.error("Gagal mem-parsing JSON dari API. Response:", {faceResult, clothingResult, accessoriesResult}, "Error:", e);
+                console.error("Gagal mem-parsing JSON dari API. Response:", resultText, "Error:", e);
                 throw new Error("Gagal membuat Character Sheet karena respons API tidak valid.");
             }
         });
