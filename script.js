@@ -1,4 +1,4 @@
-// Prompt Generator - Versi 1.6.1 (Sequential API Fix)
+// Prompt Generator - Versi 1.5.0 (Stabil - Tombol Perbaiki Dihapus)
 // Disimpan pada: Jumat, 27 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
@@ -47,7 +47,7 @@ document.addEventListener('DOMContentLoaded', () => {
         backsound: document.getElementById('backsound'),
         kalimat: document.getElementById('kalimat'),
         detail: document.getElementById('detail'),
-        sceneInteraction: document.getElementById('sceneInteraction')
+        sceneInteraction: document.getElementById('sceneInteraction') 
     };
     const generateBtn = document.getElementById('generateBtn');
     const saveCharacterBtn = document.getElementById('saveCharacterBtn');
@@ -496,7 +496,6 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
     
-    // [MODIFIED] Now uses a single, optimized API call.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
