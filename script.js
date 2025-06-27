@@ -1,4 +1,4 @@
-// Prompt Generator - Versi 1.5.0 (Stabil)
+// Prompt Generator - Versi 1.5.1 (Final API Fix)
 // Disimpan pada: Jumat, 27 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
