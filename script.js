@@ -1,4 +1,4 @@
-// Prompt Generator - Versi 1.6.0 (Final API Fix)
+// Prompt Generator - Versi 1.6.1 (Sequential API Fix)
 // Disimpan pada: Jumat, 27 Juni 2025
 
 // Wait for the DOM to be fully loaded before running the script
@@ -496,7 +496,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsDataURL(file);
     }
     
-    // [MODIFIED] Using a single, optimized API call.
+    // [MODIFIED] Now uses a single, optimized API call.
     function createCharacterDescription() {
         if (!characterImageData.face) {
             alert("Silakan unggah foto Wajah terlebih dahulu di dalam pop-up.");
